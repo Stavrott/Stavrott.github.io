@@ -168,12 +168,19 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 900;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  background: linear-gradient(160deg, #FFB060 0%, #FF4800 40%, #CC1000 100%);
+  background: linear-gradient(180deg,
+    #C8C8D2 0%,
+    #8A8A96 18%,
+    #3E3E48 40%,
+    #5A5A66 58%,
+    #9A9AA6 78%,
+    #4A4A54 100%
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   line-height: 1;
-  filter: drop-shadow(0 2px 16px rgba(255, 60, 0, 0.50));
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.80));
   margin-top: var(--space-1);
 }
 
