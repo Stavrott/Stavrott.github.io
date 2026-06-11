@@ -620,3 +620,55 @@
   opacity: 0.45; transition: opacity var(--transition-fast); font-weight: 600;
 }
 .btn-demo:hover { opacity: 1; }
+
+/* ══════════════════════════════════════════════════════════════════
+   WEEK DOTS — calendrier d'activité hebdo (dashboard)
+   ══════════════════════════════════════════════════════════════════ */
+
+.week-dots {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-2);
+}
+
+.week-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.week-dot-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.week-dot-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.week-dot-circle svg {
+  width: 14px;
+  height: 14px;
+  stroke: transparent;
+}
+
+.week-dot-circle.done {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px var(--color-primary-glow-s);
+}
+
+.week-dot-circle.done svg {
+  stroke: white;
+}
