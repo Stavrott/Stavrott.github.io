@@ -231,10 +231,30 @@ function registerPages() {
 
 let _appInitialized = false;
 
+function _initEmbers() {
+  const screen = document.getElementById('auth-screen');
+  if (!screen || screen.querySelector('.ember')) return;
+  for (let i = 0; i < 24; i++) {
+    const el    = document.createElement('div');
+    el.className = 'ember';
+    const size  = (1.5 + Math.random() * 3).toFixed(1);
+    const left  = (5  + Math.random() * 90).toFixed(1);
+    const dur   = (3.5 + Math.random() * 5).toFixed(1);
+    const delay = (-(Math.random() * 9)).toFixed(1);
+    const drift = ((Math.random() - 0.5) * 90).toFixed(0);
+    const bright = (0.55 + Math.random() * 0.45).toFixed(2);
+    el.style.cssText =
+      `width:${size}px;height:${size}px;left:${left}%;bottom:0;` +
+      `--dur:${dur}s;--delay:${delay}s;--drift:${drift}px;--bright:${bright};`;
+    screen.appendChild(el);
+  }
+}
+
 function showAuth() {
   document.getElementById('auth-screen').classList.remove('hidden');
   document.getElementById('onboarding-screen').classList.add('hidden');
   document.getElementById('main-app').classList.add('hidden');
+  _initEmbers();
 }
 
 function _launchApp() {

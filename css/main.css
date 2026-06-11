@@ -72,42 +72,64 @@ h1, h2, h3, h4, h5, h6 {
   position: relative;
 }
 
-/* Halo braise TRÈS prononcé — calqué sur la référence */
+/* Halo braise diffus — fond de scène */
 .auth-screen::before {
   content: '';
   position: fixed;
-  top: -120px;
+  bottom: -80px;
   left: 50%;
   transform: translateX(-50%);
-  width: 560px;
-  height: 560px;
+  width: 600px;
+  height: 420px;
   background: radial-gradient(
-    ellipse at center,
-    rgba(232, 48, 0, 0.22) 0%,
-    rgba(200, 30, 0, 0.14) 28%,
-    rgba(160, 20, 0, 0.06) 55%,
-    transparent 72%
+    ellipse at center bottom,
+    rgba(232, 48, 0, 0.18) 0%,
+    rgba(180, 24, 0, 0.08) 40%,
+    transparent 70%
   );
   pointer-events: none;
   z-index: 0;
 }
 
-/* Second halo plus bas pour l'effet de profondeur */
+/* Halo plus haut — profondeur subtile */
 .auth-screen::after {
   content: '';
   position: fixed;
-  bottom: 0;
+  top: -60px;
   left: 50%;
   transform: translateX(-50%);
-  width: 340px;
-  height: 240px;
+  width: 420px;
+  height: 320px;
   background: radial-gradient(
-    ellipse at center bottom,
-    rgba(232, 48, 0, 0.08) 0%,
-    transparent 70%
+    ellipse at center,
+    rgba(232, 48, 0, 0.09) 0%,
+    transparent 65%
   );
   pointer-events: none;
   z-index: 0;
+}
+
+/* ── Particules de braise flottantes ──────────────────────────────── */
+.ember {
+  position: fixed;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%,
+    #FFB040 0%, #FF5000 50%, #CC1800 100%);
+  box-shadow:
+    0 0 3px 1px rgba(255, 90, 0, 0.75),
+    0 0 8px 2px rgba(210, 40, 0, 0.35);
+  pointer-events: none;
+  animation: floatEmber var(--dur, 5s) var(--delay, 0s) infinite ease-in;
+  opacity: 0;
+  z-index: 0;
+  will-change: transform, opacity;
+}
+
+@keyframes floatEmber {
+  0%   { opacity: 0;                    transform: translateY(0)      translateX(0)                  scale(1);    }
+  7%   { opacity: var(--bright, 0.90);  }
+  85%  { opacity: calc(var(--bright, 0.90) * 0.4); }
+  100% { opacity: 0;                    transform: translateY(-78vh)  translateX(var(--drift, 0px))  scale(0.12); }
 }
 
 .auth-container {
@@ -115,7 +137,7 @@ h1, h2, h3, h4, h5, h6 {
   max-width: 390px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  gap: var(--space-6);
   position: relative;
   z-index: 1;
 }
@@ -125,73 +147,81 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
-.auth-logo-icon { width: 88px; height: 88px; }
+.auth-logo-icon { width: 96px; height: 96px; }
 
-/* Icône avec halo feu marqué */
+/* Icône avec halo feu — anneau lumineux */
 .auth-app-icon {
-  width: 100px;
-  height: 100px;
-  border-radius: 26px;
+  width: 96px;
+  height: 96px;
+  border-radius: 28px;
   object-fit: cover;
   box-shadow:
-    0 0  28px rgba(232, 60, 0, 0.60),
-    0 0  60px rgba(200, 30, 0, 0.34),
-    0 0 110px rgba(180, 20, 0, 0.18),
-    0 24px 48px rgba(0, 0, 0, 0.72);
-  border: 1px solid rgba(255, 90, 20, 0.20);
+    0 0  20px rgba(255, 80, 0, 0.70),
+    0 0  48px rgba(220, 40, 0, 0.42),
+    0 0 100px rgba(180, 20, 0, 0.22),
+    0 20px 44px rgba(0, 0, 0, 0.80);
+  border: 1.5px solid rgba(255, 100, 20, 0.28);
 }
 
 .auth-logo h1 {
-  font-size: 2.75rem;
+  font-size: 3rem;
   font-weight: 900;
-  letter-spacing: -0.05em;
-  background: var(--color-primary-grad);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: linear-gradient(160deg, #FF8040 0%, #FF3800 45%, #CC1000 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   line-height: 1;
+  filter: drop-shadow(0 0 12px rgba(255, 60, 0, 0.45));
 }
 
 .auth-logo p {
   color: var(--text-muted);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .auth-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: rgba(18, 18, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-2xl);
-  padding: var(--space-6);
-  box-shadow: var(--shadow-xl);
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.75),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  backdrop-filter: blur(0px);
 }
 
 .auth-tabs {
   display: flex;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-lg);
-  padding: 3px;
-  margin-bottom: var(--space-6);
-  gap: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: var(--radius-full);
+  padding: 4px;
+  margin-bottom: var(--space-5);
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .tab-btn {
   flex: 1;
   padding: var(--space-2) var(--space-3);
-  border-radius: calc(var(--radius-lg) - 3px);
+  border-radius: var(--radius-full);
   font-size: var(--font-size-sm);
   font-weight: 700;
   color: var(--text-muted);
   transition: all var(--transition-normal);
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
 }
 .tab-btn.active {
-  background: var(--surface-2);
+  background: var(--surface-3);
   color: var(--text-primary);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.40);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.50);
 }
 
 .auth-form-body { display: flex; flex-direction: column; gap: var(--space-4); }
