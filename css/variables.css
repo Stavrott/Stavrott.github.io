@@ -12,15 +12,15 @@
   --font-size-3xl: 2rem;       /* 32px */
   --font-size-4xl: 2.75rem;    /* 44px */
 
-  /* Rayon */
-  --radius-sm:   6px;
-  --radius-md:   10px;
-  --radius-lg:   14px;
+  /* Rayon — légèrement plus prononcé pour matcher la ref */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
   --radius-xl:   20px;
   --radius-2xl:  28px;
   --radius-full: 9999px;
 
-  /* Espacement (base 4px) */
+  /* Espacement */
   --space-1:  0.25rem;
   --space-2:  0.5rem;
   --space-3:  0.75rem;
@@ -31,82 +31,81 @@
   --space-10: 2.5rem;
   --space-12: 3rem;
 
-  /* Dimensions fixes */
-  --header-height: 52px;
+  /* Dimensions */
+  --header-height: 54px;
   --nav-height:    68px;
   --safe-bottom:   env(safe-area-inset-bottom, 0px);
 
   /* Transitions */
-  --transition-fast:   100ms ease;
-  --transition-normal: 200ms ease;
-  --transition-slow:   350ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  --transition-sheet:  320ms cubic-bezier(0.32, 0.72, 0, 1);
+  --transition-fast:   120ms ease;
+  --transition-normal: 220ms ease;
+  --transition-slow:   360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-sheet:  340ms cubic-bezier(0.32, 0.72, 0, 1);
 
   /* Couleurs d'état */
   --color-success:       #22C55E;
-  --color-success-light: rgba(34, 197, 94, 0.10);
+  --color-success-light: rgba(34, 197, 94, 0.12);
   --color-warning:       #F59E0B;
-  --color-warning-light: rgba(245, 158, 11, 0.10);
+  --color-warning-light: rgba(245, 158, 11, 0.12);
   --color-error:         #EF4444;
-  --color-error-light:   rgba(239, 68, 68, 0.10);
+  --color-error-light:   rgba(239, 68, 68, 0.12);
   --color-info:          #3B82F6;
-  --color-info-light:    rgba(59, 130, 246, 0.10);
+  --color-info-light:    rgba(59, 130, 246, 0.12);
 
-  /* ── Accent braise / feu ── */
-  --color-primary:        #F04500;
-  --color-primary-hover:  #C53300;
-  --color-primary-light:  rgba(240, 69, 0, 0.12);
-  --color-primary-glow:   rgba(240, 69, 0, 0.40);
-  --color-primary-glow-s: rgba(240, 69, 0, 0.20);
+  /* ── Accent braise — rouge-orange vive, calqué sur la référence ── */
+  --color-primary:        #E83000;
+  --color-primary-hover:  #C22600;
+  --color-primary-light:  rgba(232, 48, 0, 0.12);
+  --color-primary-glow:   rgba(232, 48, 0, 0.50);
+  --color-primary-glow-s: rgba(232, 48, 0, 0.25);
 
-  /* Gradient feu : braise sombre → flamme vive → orangé */
-  --color-primary-grad: linear-gradient(135deg, #C53300 0%, #F04500 55%, #FF7200 100%);
-  --color-primary-grad-v: linear-gradient(180deg, #C53300 0%, #F04500 60%, #FF7200 100%);
+  /* Gradient : braise profonde → vive → tip orangée */
+  --color-primary-grad:   linear-gradient(135deg, #B01800 0%, #E83000 48%, #FF4500 100%);
+  --color-primary-grad-v: linear-gradient(180deg, #B01800 0%, #E83000 55%, #FF4500 100%);
 
-  /* Ombres */
-  --shadow-accent: 0 8px 28px rgba(240, 69, 0, 0.42);
-  --shadow-accent-sm: 0 4px 14px rgba(240, 69, 0, 0.32);
+  /* Ombres accent */
+  --shadow-accent:    0 8px 32px rgba(232, 48, 0, 0.50);
+  --shadow-accent-sm: 0 4px 16px rgba(232, 48, 0, 0.38);
 }
 
 /* ── Thème sombre (défaut) ──────────────────────────────────────── */
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* Fond quasi-noir légèrement chaud */
-  --background:    #090909;
-  --bg-secondary:  #0E0E0E;
-  --surface:       #111111;
-  --surface-2:     #171717;
-  --surface-3:     #1E1E1E;
-  --surface-4:     #252525;
+  /* Calqué sur la référence : quasi-noir légèrement chaud */
+  --background:    #0C0C0C;
+  --bg-secondary:  #111111;
+  --surface:       #181818;
+  --surface-2:     #1E1E1E;
+  --surface-3:     #252525;
+  --surface-4:     #2D2D2D;
 
-  --border:        rgba(255, 255, 255, 0.055);
-  --border-strong: rgba(255, 255, 255, 0.10);
-  --border-focus:  rgba(240, 69, 0, 0.55);
+  /* Bordures fines mais perceptibles */
+  --border:        rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --border-focus:  rgba(232, 48, 0, 0.60);
+  --border-ember:  rgba(232, 80, 0, 0.30);
 
-  /* Teinte chaud sur le border accent */
-  --border-ember:  rgba(240, 100, 0, 0.25);
+  --text-primary:   #F2F2F2;
+  --text-secondary: rgba(255, 255, 255, 0.52);
+  --text-muted:     rgba(255, 255, 255, 0.26);
+  --text-inverse:   #0C0C0C;
 
-  --text-primary:   #F5F5F5;
-  --text-secondary: rgba(255, 255, 255, 0.48);
-  --text-muted:     rgba(255, 255, 255, 0.22);
-  --text-inverse:   #090909;
+  --shadow-sm:  0 1px 4px  rgba(0, 0, 0, 0.65);
+  --shadow-md:  0 4px 20px rgba(0, 0, 0, 0.72);
+  --shadow-lg:  0 8px 40px rgba(0, 0, 0, 0.80);
+  --shadow-xl:  0 16px 64px rgba(0, 0, 0, 0.90);
 
-  --shadow-sm:  0 1px 3px  rgba(0, 0, 0, 0.55);
-  --shadow-md:  0 4px 16px rgba(0, 0, 0, 0.65);
-  --shadow-lg:  0 8px 32px rgba(0, 0, 0, 0.75);
-  --shadow-xl:  0 16px 56px rgba(0, 0, 0, 0.85);
+  --scrollbar-thumb: #2D2D2D;
+  --scrollbar-track: #111111;
 
-  --scrollbar-thumb: #252525;
-  --scrollbar-track: #0E0E0E;
-
-  --nav-bg:      rgba(9, 9, 9, 0.97);
-  --header-bg:   rgba(9, 9, 9, 0.95);
-  --glass-bg:    rgba(17, 17, 17, 0.88);
+  --nav-bg:       rgba(12, 12, 12, 0.98);
+  --header-bg:    rgba(12, 12, 12, 0.96);
+  --glass-bg:     rgba(24, 24, 24, 0.92);
   --glass-border: rgba(255, 255, 255, 0.07);
 
   --chart-grid:  rgba(255, 255, 255, 0.04);
-  --chart-line:  #F04500;
+  --chart-line:  #E83000;
 }
 
 /* ── Thème clair ────────────────────────────────────────────────── */
@@ -120,14 +119,14 @@
   --surface-3:     #E5E5EA;
   --surface-4:     #D8D8DC;
 
-  --border:        rgba(0, 0, 0, 0.06);
-  --border-strong: rgba(0, 0, 0, 0.12);
-  --border-focus:  rgba(240, 69, 0, 0.50);
-  --border-ember:  rgba(240, 69, 0, 0.20);
+  --border:        rgba(0, 0, 0, 0.07);
+  --border-strong: rgba(0, 0, 0, 0.13);
+  --border-focus:  rgba(232, 48, 0, 0.55);
+  --border-ember:  rgba(232, 48, 0, 0.22);
 
   --text-primary:   #0D0D0D;
   --text-secondary: rgba(0, 0, 0, 0.55);
-  --text-muted:     rgba(0, 0, 0, 0.30);
+  --text-muted:     rgba(0, 0, 0, 0.32);
   --text-inverse:   #FFFFFF;
 
   --shadow-sm:  0 1px 3px  rgba(0, 0, 0, 0.08);
@@ -138,11 +137,11 @@
   --scrollbar-thumb: #C7C7CC;
   --scrollbar-track: #F2F2F7;
 
-  --nav-bg:     rgba(242, 242, 247, 0.95);
-  --header-bg:  rgba(242, 242, 247, 0.90);
-  --glass-bg:   rgba(255, 255, 255, 0.85);
+  --nav-bg:     rgba(242, 242, 247, 0.96);
+  --header-bg:  rgba(242, 242, 247, 0.92);
+  --glass-bg:   rgba(255, 255, 255, 0.88);
   --glass-border: rgba(0, 0, 0, 0.08);
 
   --chart-grid:  rgba(0, 0, 0, 0.04);
-  --chart-line:  #F04500;
+  --chart-line:  #E83000;
 }

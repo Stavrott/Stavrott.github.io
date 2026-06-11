@@ -1,4 +1,4 @@
-const CACHE_NAME = 'esse-v1';
+const CACHE_NAME = 'esse-v2';
 const STATIC_ASSETS = [
   '/esse-app/',
   '/esse-app/index.html',
