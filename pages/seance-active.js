@@ -32,7 +32,7 @@ export async function startSeance(nom, section, onFinish) {
 
   render();
   _elapsedId = setInterval(_tickElapsed, 1000);
-  showToast(`Séance "${nom}" démarrée 💪`, 'success');
+  showToast(`Séance "${nom}" démarrée`, 'success');
 }
 
 export function resumeActiveView(section) {
@@ -60,12 +60,12 @@ function render() {
     <div class="session-bar">
       <div class="session-info">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="session-clock"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span id="session-elapsed">${formatTime(Math.floor((Date.now() - _startTime) / 1000))}</span>
+        <span class="session-elapsed" id="session-elapsed">${formatTime(Math.floor((Date.now() - _startTime) / 1000))}</span>
         <span class="session-sep">•</span>
         <span id="session-stats">${_statsLabel(exoCount, setsDone)}</span>
       </div>
       <button class="btn btn-success btn-sm" id="btn-finish-seance">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><polyline points="20 6 9 17 4 12"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="20 6 9 17 4 12"/></svg>
         Terminer
       </button>
     </div>
@@ -76,7 +76,7 @@ function render() {
       ${_state.exercices.map((e, i) => _cardHTML(e, i)).join('')}
     </div>
 
-    <button class="btn btn-secondary btn-full btn-add-exo" id="btn-add-exo">
+    <button class="btn-add-exo" id="btn-add-exo">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="width:18px;height:18px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Ajouter un exercice
     </button>`;
@@ -90,7 +90,7 @@ function _statsLabel(exoCount, setsDone) {
   return e + s;
 }
 
-// ── HTML carte exercice ───────────────────────────────────────────────
+// ── HTML carte exercice (style Hevy) ──────────────────────────────────
 
 function _cardHTML(exo, i) {
   return `
@@ -106,59 +106,47 @@ function _cardHTML(exo, i) {
       </div>
 
       <div class="sets-header-row">
-        <span style="width:28px;flex-shrink:0">#</span>
-        <span>Poids (kg)</span>
-        <span>Reps</span>
-        <span style="width:80px;flex-shrink:0;text-align:center">Repos</span>
-        <span style="width:36px;flex-shrink:0"></span>
+        <span class="col-num">#</span>
+        <span class="col-prev">Précédent</span>
+        <span class="col-kg">kg</span>
+        <span class="col-reps">Reps</span>
+        <span class="col-done"></span>
       </div>
 
       <div class="sets-list" data-exo-sets="${i}">
-        ${exo.sets.map((s, si) => _setRowHTML(s, i, si)).join('')}
+        ${exo.sets.map((s, si) => _setRowHTML(s, i, si, exo.lastPerf)).join('')}
       </div>
 
-      <button class="btn btn-ghost btn-sm btn-add-serie" data-action="add-serie" data-exo="${i}">
+      <button class="btn-add-serie" data-action="add-serie" data-exo="${i}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Ajouter une série
       </button>
     </div>`;
 }
 
-// ── HTML ligne de série ───────────────────────────────────────────────
+// ── HTML ligne de série (style Hevy) ──────────────────────────────────
 
-function _setRowHTML(set, ei, si) {
+function _setRowHTML(set, ei, si, lastPerf = null) {
   const done = set.done;
+  const prev = done
+    ? (set.poids ? `${set.poids} × ${set.reps ?? '?'}` : '')
+    : (lastPerf ?? '—');
+
   return `
-    <div class="set-row-wrapper ${done ? 'set-done' : ''}" data-exo="${ei}" data-set="${si}">
-      <div class="set-row-main">
-        <div class="set-num ${done ? 'set-num-done' : ''}">${si + 1}</div>
-        <input class="set-input" type="number" inputmode="decimal" step="0.5" min="0"
-          placeholder="—" value="${set.poids ?? ''}"
-          data-field="poids" data-exo="${ei}" data-set="${si}" ${done ? 'disabled' : ''}>
-        <input class="set-input" type="number" inputmode="numeric" min="0"
-          placeholder="—" value="${set.reps ?? ''}"
-          data-field="reps" data-exo="${ei}" data-set="${si}" ${done ? 'disabled' : ''}>
-        <div class="set-rest-cell">
-          <button class="set-btn-rest ${done ? 'set-btn-rest-done' : ''}"
-            data-action="start-timer" data-exo="${ei}" data-set="${si}"
-            title="Démarrer le timer">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            ${done && set.repos ? `<span>${set.repos}s</span>` : ''}
-          </button>
-        </div>
-        <button class="set-btn-done ${done ? 'set-btn-done-active' : ''}"
-          data-action="toggle-done" data-exo="${ei}" data-set="${si}"
-          aria-label="Valider la série">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
-      </div>
-      <div class="set-notes-row" data-notes-row="${ei}-${si}">
-        <input class="set-notes-input" type="text"
-          placeholder="Note (facultatif)…"
-          value="${set.notes ?? ''}"
-          data-field="notes" data-exo="${ei}" data-set="${si}"
-          ${done ? 'disabled' : ''}>
-      </div>
+    <div class="set-row ${done ? 'set-done' : ''}" data-exo="${ei}" data-set="${si}">
+      <div class="set-num ${done ? 'set-num-done' : ''}">${si + 1}</div>
+      <div class="set-prev">${prev}</div>
+      <input class="set-input" type="number" inputmode="decimal" step="0.5" min="0"
+        placeholder="0" value="${set.poids ?? ''}"
+        data-field="poids" data-exo="${ei}" data-set="${si}" ${done ? 'disabled' : ''}>
+      <input class="set-input set-input-reps" type="number" inputmode="numeric" min="0"
+        placeholder="0" value="${set.reps ?? ''}"
+        data-field="reps" data-exo="${ei}" data-set="${si}" ${done ? 'disabled' : ''}>
+      <button class="set-check ${done ? 'set-check-done' : ''}"
+        data-action="toggle-done" data-exo="${ei}" data-set="${si}"
+        aria-label="Valider la série">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
     </div>`;
 }
 
@@ -183,7 +171,6 @@ function _onCardClick(e) {
   if (action === 'remove-exo')  _removeExo(ei);
   if (action === 'add-serie')   _addSerie(ei);
   if (action === 'toggle-done') _toggleDone(ei, si);
-  if (action === 'start-timer') startRestTimer(APP_CONFIG.defaultRestTime);
 }
 
 function _onInputChange(e) {
@@ -197,7 +184,6 @@ function _onInputChange(e) {
 
   if (field === 'poids') set.poids = parseFloat(input.value) || null;
   else if (field === 'reps') set.reps = parseInt(input.value) || null;
-  else if (field === 'notes') set.notes = input.value;
 }
 
 // ── Actions ───────────────────────────────────────────────────────────
@@ -212,7 +198,7 @@ export async function addExercice(nom) {
     sets: [{
       poids: lastSet?.poids_kg    ?? null,
       reps:  lastSet?.repetitions ?? null,
-      repos: null, notes: '', done: false, dbId: null,
+      repos: null, done: false, dbId: null,
     }],
   });
 
@@ -223,10 +209,8 @@ export async function addExercice(nom) {
   }, 60);
 }
 
-// Ajouter plusieurs exercices d'un coup (depuis un programme) ──────────
 export async function addExercices(noms) {
   if (!noms?.length) return;
-  // Récupérer toutes les dernières perfs en parallèle
   const perfs = await Promise.all(noms.map(n => _fetchLastPerf(n)));
 
   noms.forEach((nom, i) => {
@@ -238,7 +222,7 @@ export async function addExercices(noms) {
       sets: [{
         poids: s?.poids_kg    ?? null,
         reps:  s?.repetitions ?? null,
-        repos: null, notes: '', done: false, dbId: null,
+        repos: null, done: false, dbId: null,
       }],
     });
   });
@@ -258,19 +242,15 @@ function _addSerie(ei) {
   const newSet  = {
     poids: lastSet?.poids ?? null,
     reps:  lastSet?.reps  ?? null,
-    repos: null,
-    notes: '',
-    done:  false,
-    dbId:  null,
+    repos: null, done: false, dbId: null,
   };
   const si = exo.sets.length;
   exo.sets.push(newSet);
 
-  // Ajout partiel sans re-render complet (préserve le focus)
   const setsList = _section.querySelector(`[data-exo-sets="${ei}"]`);
   if (setsList) {
     const tmp = document.createElement('div');
-    tmp.innerHTML = _setRowHTML(newSet, ei, si);
+    tmp.innerHTML = _setRowHTML(newSet, ei, si, exo.lastPerf);
     setsList.appendChild(tmp.firstElementChild);
     setsList.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -281,29 +261,24 @@ async function _toggleDone(ei, si) {
   const set = _state.exercices[ei]?.sets[si];
   if (!set) return;
 
-  // Lire les valeurs actuelles des inputs
   const poidsEl = _section.querySelector(`input[data-field="poids"][data-exo="${ei}"][data-set="${si}"]`);
   const repsEl  = _section.querySelector(`input[data-field="reps"][data-exo="${ei}"][data-set="${si}"]`);
-  const notesEl = _section.querySelector(`input[data-field="notes"][data-exo="${ei}"][data-set="${si}"]`);
   if (poidsEl) set.poids = parseFloat(poidsEl.value) || null;
   if (repsEl)  set.reps  = parseInt(repsEl.value)    || null;
-  if (notesEl) set.notes = notesEl.value || '';
 
   if (!set.done) {
     set.done  = true;
     set.repos = APP_CONFIG.defaultRestTime;
 
-    // Sauvegarde Supabase
     try {
       const { data } = await supabase.from('series').insert({
-        user_id:      currentUser.id,
-        seance_id:    _state.seance.id,
-        exercice_nom: _state.exercices[ei].nom,
-        numero_serie: si + 1,
-        poids_kg:     set.poids,
-        repetitions:  set.reps,
+        user_id:       currentUser.id,
+        seance_id:     _state.seance.id,
+        exercice_nom:  _state.exercices[ei].nom,
+        numero_serie:  si + 1,
+        poids_kg:      set.poids,
+        repetitions:   set.reps,
         temps_repos_s: set.repos,
-        notes:        set.notes || null,
       }).select().single();
       if (data) set.dbId = data.id;
     } catch {
@@ -312,10 +287,8 @@ async function _toggleDone(ei, si) {
       return;
     }
 
-    // Démarrer le timer de repos automatiquement
     startRestTimer(APP_CONFIG.defaultRestTime);
   } else {
-    // Dé-valider : supprimer en base
     set.done = false;
     if (set.dbId) {
       await supabase.from('series').delete().eq('id', set.dbId).catch(() => {});
@@ -323,12 +296,11 @@ async function _toggleDone(ei, si) {
     }
   }
 
-  // Mise à jour ciblée de la ligne
-  const wrapper = _section.querySelector(`.set-row-wrapper[data-exo="${ei}"][data-set="${si}"]`);
-  if (wrapper) {
+  const row = _section.querySelector(`.set-row[data-exo="${ei}"][data-set="${si}"]`);
+  if (row) {
     const tmp = document.createElement('div');
-    tmp.innerHTML = _setRowHTML(set, ei, si);
-    wrapper.replaceWith(tmp.firstElementChild);
+    tmp.innerHTML = _setRowHTML(set, ei, si, _state.exercices[ei].lastPerf);
+    row.replaceWith(tmp.firstElementChild);
   }
   _updateStatsBar();
 }
@@ -385,7 +357,7 @@ export async function openExercicePicker() {
     list.innerHTML = filtered.length === 0
       ? `<p class="picker-empty">Aucun exercice trouvé</p>`
       : filtered.map(e => `
-          <button class="list-item clickable picker-exo-btn" data-nom="${e.nom}" style="width:100%;text-align:left">
+          <button class="picker-exo-btn" data-nom="${e.nom}">
             <div class="item-body">
               <p class="item-title">${e.nom}</p>
               <p class="item-subtitle">${e.groupe} • ${e.materiel}</p>
@@ -406,7 +378,7 @@ export async function openExercicePicker() {
           <div class="search-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </div>
-          <input class="search-input" id="picker-search" placeholder="Rechercher ou saisir un nom…" type="search" autocomplete="off">
+          <input class="search-input" id="picker-search" placeholder="Rechercher un exercice…" type="search" autocomplete="off">
         </div>
         <div class="filter-chips" id="picker-chips" style="margin-bottom:0">
           ${GROUPES.map((g, i) => `<div class="chip ${i === 0 ? 'active' : ''}" data-groupe="${g}">${g}</div>`).join('')}
@@ -421,8 +393,6 @@ export async function openExercicePicker() {
   document.getElementById('picker-search')?.addEventListener('input', e => {
     search = e.target.value.toLowerCase().trim();
     rerender();
-
-    // Option "exercice personnalisé"
     const raw  = e.target.value.trim();
     const wrap = document.getElementById('picker-custom-wrap');
     if (wrap) {
@@ -466,12 +436,12 @@ async function _confirmFinish() {
       <div class="seance-finish-summary">
         <div class="grid-2">
           <div class="card" style="text-align:center">
-            <p class="card-title">Durée</p>
-            <p class="card-value">${duree}<span> min</span></p>
+            <p class="card-label">Durée</p>
+            <p class="card-value" style="font-size:var(--font-size-2xl)">${duree}<span class="card-unit"> min</span></p>
           </div>
           <div class="card" style="text-align:center">
-            <p class="card-title">Séries validées</p>
-            <p class="card-value">${totalSets}</p>
+            <p class="card-label">Séries validées</p>
+            <p class="card-value" style="font-size:var(--font-size-2xl)">${totalSets}</p>
           </div>
         </div>
         <div class="form-group" style="margin-top:var(--space-4)">
@@ -494,7 +464,7 @@ async function _doFinish(duree) {
   const notes = document.getElementById('seance-notes-final')?.value.trim() || null;
   try {
     await supabase.from('seances').update({ duree_minutes: duree, notes }).eq('id', _state.seance.id);
-    showToast(`Séance terminée — ${duree} min 🎉`, 'success', 4000);
+    showToast(`Séance terminée — ${duree} min`, 'success', 4000);
   } catch {
     showToast('Erreur lors de la finalisation', 'error');
   }

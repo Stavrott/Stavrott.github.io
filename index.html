@@ -241,17 +241,34 @@
       </div>
     </div>
 
-    <!-- ── Timer de repos flottant ─────────────────────────────── -->
-    <div id="timer-widget" class="timer-widget hidden">
-      <div class="timer-display" id="timer-display">00:00</div>
-      <div class="timer-controls">
-        <button class="timer-btn" id="timer-start-stop" aria-label="Démarrer/Pause">
-          <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          <svg class="icon-pause hidden" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-        </button>
-        <button class="timer-btn timer-btn-sm" id="timer-reset" aria-label="Réinitialiser">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
-        </button>
+    <!-- ── Timer de repos — bottom sheet ────────────────────────── -->
+    <div id="timer-overlay" class="timer-overlay hidden">
+      <div class="timer-backdrop" id="timer-backdrop"></div>
+      <div class="timer-sheet">
+        <div class="timer-handle"></div>
+        <p class="timer-sheet-label">Temps de repos</p>
+
+        <div class="timer-ring-wrap">
+          <svg class="timer-ring-svg" viewBox="0 0 200 200">
+            <circle class="timer-ring-track"  cx="100" cy="100" r="88"/>
+            <circle class="timer-ring-fill"   cx="100" cy="100" r="88" id="timer-ring-fill"/>
+          </svg>
+          <div class="timer-ring-center">
+            <div class="timer-display" id="timer-display">01:30</div>
+            <p class="timer-status" id="timer-status">En cours</p>
+          </div>
+        </div>
+
+        <div class="timer-controls">
+          <button class="timer-adj-btn" id="timer-minus" aria-label="-15 secondes">−15s</button>
+          <button class="timer-main-btn" id="timer-start-stop" aria-label="Pause/Reprendre">
+            <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            <svg class="icon-play hidden" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </button>
+          <button class="timer-adj-btn" id="timer-plus" aria-label="+15 secondes">+15s</button>
+        </div>
+
+        <button class="timer-skip-btn" id="timer-skip">Passer le repos</button>
       </div>
     </div>
 
