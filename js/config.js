@@ -1,0 +1,18 @@
+// ⚠️  Remplacez ces valeurs par vos identifiants Supabase
+// Disponibles dans : Supabase Dashboard → Settings → API
+
+export const SUPABASE_URL      = 'https://ytkrjraoqmroankhidip.supabase.co';
+export const SUPABASE_ANON_KEY = 'sb_publishable_bBM2IhLy67iX7-e-n6SaFg__WDrReHj';
+
+// Nom du cache Service Worker (incrémentez lors de mises à jour)
+export const SW_CACHE_VERSION = 'v1';
+
+// Paramètres de l'application
+export const APP_CONFIG = {
+  name:       'Esse',
+  version:    '1.0.0',
+  // Durée de repos par défaut entre les séries (secondes)
+  defaultRestTime: 90,
+  // Niveaux pour le calcul du 1RM (formule Epley)
+  maxRepRange: 12,
+};

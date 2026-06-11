@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f0f0f" id="theme-meta">
+  <meta name="description" content="Application de suivi de musculation">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Esse">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <title>Esse</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+
+  <div id="app" class="app">
+
+    <!-- ── Écran d'authentification ────────────────────────────── -->
+    <div id="auth-screen" class="auth-screen hidden">
+      <div class="auth-container">
+
+        <div class="auth-logo">
+          <div class="auth-logo-icon">
+            <img src="icons/icon-192.png" alt="Esse" class="auth-app-icon">
+          </div>
+          <h1>Esse</h1>
+          <p>Votre compagnon de musculation</p>
+        </div>
+
+        <div class="auth-card">
+          <div class="auth-tabs">
+            <button class="tab-btn active" data-tab="login">Connexion</button>
+            <button class="tab-btn" data-tab="register">Inscription</button>
+          </div>
+
+          <form id="login-form" class="auth-form-body">
+            <div class="form-group">
+              <label class="form-label" for="login-email">Adresse e-mail</label>
+              <input class="form-input" type="email" id="login-email" placeholder="vous@exemple.fr" required autocomplete="email">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="login-password">Mot de passe</label>
+              <input class="form-input" type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn btn-primary btn-full btn-lg">Se connecter</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-forgot-password"
+              style="align-self:center;color:var(--text-muted)">
+              Mot de passe oublié ?
+            </button>
+          </form>
+
+          <form id="register-form" class="auth-form-body hidden">
+            <div class="form-group">
+              <label class="form-label" for="register-name">Prénom</label>
+              <input class="form-input" type="text" id="register-name" placeholder="Jean" required autocomplete="given-name">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="register-email">Adresse e-mail</label>
+              <input class="form-input" type="email" id="register-email" placeholder="vous@exemple.fr" required autocomplete="email">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="register-password">Mot de passe</label>
+              <input class="form-input" type="password" id="register-password" placeholder="6 caractères minimum" required autocomplete="new-password" minlength="6">
+            </div>
+            <button type="submit" class="btn btn-primary btn-full btn-lg">Créer mon compte</button>
+          </form>
+
+          <form id="reset-form" class="auth-form-body hidden">
+            <p style="font-size:var(--font-size-sm);color:var(--text-secondary);text-align:center;line-height:1.6">
+              Saisissez votre e-mail pour recevoir un lien de réinitialisation.
+            </p>
+            <div class="form-group">
+              <label class="form-label" for="reset-email">Adresse e-mail</label>
+              <input class="form-input" type="email" id="reset-email" placeholder="vous@exemple.fr" required autocomplete="email">
+            </div>
+            <button type="submit" class="btn btn-primary btn-full btn-lg">Envoyer le lien</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-back-login"
+              style="align-self:center;color:var(--text-muted)">
+              ← Retour à la connexion
+            </button>
+          </form>
+
+          <p id="auth-success" class="auth-success hidden"></p>
+          <p id="auth-error"   class="auth-error hidden"></p>
+
+          <!-- Bouton Mode démo — affiché uniquement sur localhost via JS -->
+          <div class="auth-demo-section hidden" id="auth-demo-section">
+            <button class="btn btn-ghost btn-sm btn-demo" id="btn-demo">
+              Mode démo
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Onboarding ────────────────────────────────────────────── -->
+    <div id="onboarding-screen" class="onboarding-screen hidden"></div>
+
+    <!-- ── Application principale ──────────────────────────────── -->
+    <div id="main-app" class="main-app hidden">
+
+      <!-- Header -->
+      <header class="app-header" id="app-header">
+        <div class="header-left">
+          <button id="back-btn" class="icon-btn hidden" aria-label="Retour">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 12H5M12 5l-7 7 7 7"/>
+            </svg>
+          </button>
+          <span id="page-title" class="page-title">Esse</span>
+        </div>
+        <div class="header-right">
+          <button id="theme-toggle" class="icon-btn" aria-label="Changer le thème">
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+            <svg class="icon-moon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+            </svg>
+          </button>
+          <button id="user-menu-btn" class="icon-btn" aria-label="Menu utilisateur">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Contenu principal -->
+      <main class="app-main" id="app-main">
+        <section id="page-home"       class="page active" data-page="home"></section>
+        <section id="page-seances"    class="page hidden" data-page="seances"></section>
+        <section id="page-programmes" class="page hidden" data-page="programmes"></section>
+        <section id="page-stats"      class="page hidden" data-page="stats"></section>
+        <section id="page-nutrition"  class="page hidden" data-page="nutrition"></section>
+        <section id="page-exercices"  class="page hidden" data-page="exercices"></section>
+        <section id="page-profil"     class="page hidden" data-page="profil"></section>
+      </main>
+
+      <!-- Navigation inférieure -->
+      <nav class="bottom-nav" id="bottom-nav" role="navigation" aria-label="Navigation principale">
+        <button class="nav-item active" data-page="home" aria-label="Accueil">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <span>Accueil</span>
+        </button>
+        <button class="nav-item" data-page="seances" aria-label="Séances">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/>
+          </svg>
+          <span>Séances</span>
+        </button>
+        <button class="nav-item" data-page="stats" aria-label="Statistiques">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+          <span>Stats</span>
+        </button>
+        <button class="nav-item" data-page="nutrition" aria-label="Nutrition">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+          </svg>
+          <span>Nutrition</span>
+        </button>
+        <button class="nav-item" data-page="exercices" aria-label="Exercices">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+          </svg>
+          <span>Exercices</span>
+        </button>
+      </nav>
+
+    </div>
+
+    <!-- ── Menu utilisateur (drawer) ───────────────────────────── -->
+    <div id="user-drawer" class="drawer hidden">
+      <div class="drawer-overlay"></div>
+      <div class="drawer-panel">
+        <div class="drawer-header">
+          <div class="user-avatar" id="drawer-avatar">A</div>
+          <div>
+            <p class="user-name" id="drawer-name">Utilisateur</p>
+            <p class="user-email" id="drawer-email">—</p>
+          </div>
+        </div>
+        <div class="drawer-body">
+          <button class="drawer-item" id="btn-profil">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Mon profil
+          </button>
+          <hr class="drawer-separator">
+          <button class="drawer-item" id="btn-export">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exporter les données (JSON)
+          </button>
+          <button class="drawer-item" id="btn-import">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Importer des données (JSON)
+          </button>
+          <input type="file" id="import-file-input" accept=".json" class="hidden">
+          <hr class="drawer-separator">
+          <button class="drawer-item drawer-item-danger" id="btn-logout">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Se déconnecter
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Modal générique ─────────────────────────────────────── -->
+    <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true">
+      <div class="modal" id="modal">
+        <div class="modal-header">
+          <h2 class="modal-title" id="modal-title"></h2>
+          <button class="icon-btn" id="modal-close" aria-label="Fermer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-footer" id="modal-footer"></div>
+      </div>
+    </div>
+
+    <!-- ── Timer de repos flottant ─────────────────────────────── -->
+    <div id="timer-widget" class="timer-widget hidden">
+      <div class="timer-display" id="timer-display">00:00</div>
+      <div class="timer-controls">
+        <button class="timer-btn" id="timer-start-stop" aria-label="Démarrer/Pause">
+          <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <svg class="icon-pause hidden" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        </button>
+        <button class="timer-btn timer-btn-sm" id="timer-reset" aria-label="Réinitialiser">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Toasts ───────────────────────────────────────────────── -->
+    <div id="toast-container" class="toast-container" role="status" aria-live="polite"></div>
+
+    <!-- ── Overlay de chargement ───────────────────────────────── -->
+    <div id="loading-overlay" class="loading-overlay hidden" aria-live="assertive">
+      <div class="spinner"></div>
+    </div>
+
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,206 @@
+// Page Nutrition — calories, macros, micro-nutriments
+import { currentUser }  from '../js/auth.js';
+import { supabase }     from '../js/supabase.js';
+import { showToast, todayStr, formatDate, openModal } from '../js/utils.js';
+
+export async function loadNutrition(section) {
+  section.innerHTML = `
+    <div class="tabs" id="nutri-tabs">
+      <button class="tab active" data-tab="journal">Journal</button>
+      <button class="tab" data-tab="objectifs">Objectifs</button>
+    </div>
+    <div id="nutri-content">
+      ${skeletonNutri()}
+    </div>
+    <button class="fab" id="btn-add-repas" aria-label="Ajouter un repas">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="width:24px;height:24px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>`;
+
+  await renderJournal(section, todayStr());
+
+  section.querySelectorAll('.tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      section.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+      if (tab.dataset.tab === 'journal') renderJournal(section, todayStr());
+      else renderObjectifs(section);
+    });
+  });
+
+  section.querySelector('#btn-add-repas')?.addEventListener('click', () => openAddRepasModal(section));
+}
+
+function skeletonNutri() {
+  return `
+    <div class="skeleton" style="height:100px;border-radius:var(--radius-lg);margin-bottom:var(--space-4)"></div>
+    <div class="skeleton skeleton-card" style="margin-bottom:var(--space-3)"></div>
+    <div class="skeleton skeleton-card"></div>`;
+}
+
+async function renderJournal(section, date) {
+  const content = section.querySelector('#nutri-content');
+  content.innerHTML = skeletonNutri();
+
+  try {
+    const [{ data: repas }, { data: objectifs }] = await Promise.all([
+      supabase.from('nutrition').select('*').eq('user_id', currentUser.id).eq('date', date).order('created_at'),
+      supabase.from('objectifs_nutrition').select('*').eq('user_id', currentUser.id).maybeSingle(),
+    ]);
+
+    const obj = objectifs || { calories: 2000, proteines: 150, glucides: 200, lipides: 70 };
+    const totaux = (repas ?? []).reduce((acc, r) => {
+      acc.calories  += r.calories  || 0;
+      acc.proteines += r.proteines || 0;
+      acc.glucides  += r.glucides  || 0;
+      acc.lipides   += r.lipides   || 0;
+      return acc;
+    }, { calories: 0, proteines: 0, glucides: 0, lipides: 0 });
+
+    const pct = (v, max) => Math.min(Math.round((v / max) * 100), 100);
+
+    content.innerHTML = `
+      <!-- Résumé calories -->
+      <div class="card page-section" style="background:var(--color-primary-grad);border:none;color:white">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:var(--space-3)">
+          <div>
+            <p style="font-size:var(--font-size-xs);font-weight:600;opacity:0.8;text-transform:uppercase;letter-spacing:.05em">Calories aujourd'hui</p>
+            <p style="font-size:var(--font-size-3xl);font-weight:800;margin-top:4px">${totaux.calories} <span style="font-size:var(--font-size-md);opacity:0.7">/ ${obj.calories} kcal</span></p>
+          </div>
+          <div style="text-align:right">
+            <p style="font-size:var(--font-size-xs);opacity:0.8">Restant</p>
+            <p style="font-size:var(--font-size-xl);font-weight:800">${Math.max(obj.calories - totaux.calories, 0)}</p>
+          </div>
+        </div>
+        <div class="progress-bar" style="background:rgba(255,255,255,0.2)">
+          <div class="progress-fill" style="background:rgba(255,255,255,0.9);width:${pct(totaux.calories, obj.calories)}%"></div>
+        </div>
+      </div>
+
+      <!-- Macros -->
+      <div class="macro-grid page-section">
+        <div class="macro-item protein">
+          <p class="macro-value">${totaux.proteines}g</p>
+          <p class="macro-label">Protéines</p>
+          <div class="progress-bar" style="margin-top:var(--space-2)">
+            <div class="progress-fill" style="background:#3b82f6;width:${pct(totaux.proteines, obj.proteines)}%"></div>
+          </div>
+          <p style="font-size:10px;color:var(--text-muted);margin-top:4px">/ ${obj.proteines}g</p>
+        </div>
+        <div class="macro-item carbs">
+          <p class="macro-value">${totaux.glucides}g</p>
+          <p class="macro-label">Glucides</p>
+          <div class="progress-bar" style="margin-top:var(--space-2)">
+            <div class="progress-fill" style="background:#f59e0b;width:${pct(totaux.glucides, obj.glucides)}%"></div>
+          </div>
+          <p style="font-size:10px;color:var(--text-muted);margin-top:4px">/ ${obj.glucides}g</p>
+        </div>
+        <div class="macro-item fat">
+          <p class="macro-value">${totaux.lipides}g</p>
+          <p class="macro-label">Lipides</p>
+          <div class="progress-bar" style="margin-top:var(--space-2)">
+            <div class="progress-fill" style="background:#ef4444;width:${pct(totaux.lipides, obj.lipides)}%"></div>
+          </div>
+          <p style="font-size:10px;color:var(--text-muted);margin-top:4px">/ ${obj.lipides}g</p>
+        </div>
+      </div>
+
+      <!-- Liste des repas -->
+      <div class="page-section">
+        <h3 class="section-title" style="margin-bottom:var(--space-3)">Repas du jour</h3>
+        <div class="item-list" id="repas-list">
+          ${(repas ?? []).length === 0
+            ? `<p style="color:var(--text-muted);font-size:var(--font-size-sm);text-align:center;padding:var(--space-6) 0">Aucun repas enregistré aujourd'hui</p>`
+            : (repas ?? []).map(renderRepasItem).join('')}
+        </div>
+      </div>`;
+  } catch {
+    content.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:var(--space-6)">Erreur de chargement</p>`;
+  }
+}
+
+function renderRepasItem(r) {
+  return `
+    <div class="list-item">
+      <div class="item-icon accent">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/>
+          <line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+        </svg>
+      </div>
+      <div class="item-body">
+        <p class="item-title">${r.nom || 'Repas'}</p>
+        <p class="item-subtitle">P: ${r.proteines || 0}g • G: ${r.glucides || 0}g • L: ${r.lipides || 0}g</p>
+      </div>
+      <div class="item-meta">
+        <p class="item-meta-primary">${r.calories || 0} kcal</p>
+      </div>
+    </div>`;
+}
+
+function renderObjectifs(section) {
+  const content = section.querySelector('#nutri-content');
+  content.innerHTML = `<p style="text-align:center;color:var(--text-muted);padding:var(--space-12);font-size:var(--font-size-sm)">
+    🎯 Configuration des objectifs caloriques et macro — à venir.
+  </p>`;
+}
+
+function openAddRepasModal(section) {
+  openModal({
+    title: 'Ajouter un repas',
+    body: `
+      <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+        <div class="form-group">
+          <label class="form-label">Nom du repas / aliment</label>
+          <input class="form-input" id="repas-nom" placeholder="ex: Poulet riz brocolis" type="text">
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Calories (kcal)</label>
+            <input class="form-input" id="repas-cal" type="number" min="0" placeholder="500">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Protéines (g)</label>
+            <input class="form-input" id="repas-prot" type="number" min="0" placeholder="40">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Glucides (g)</label>
+            <input class="form-input" id="repas-gluc" type="number" min="0" placeholder="60">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Lipides (g)</label>
+            <input class="form-input" id="repas-lip" type="number" min="0" placeholder="15">
+          </div>
+        </div>
+      </div>`,
+    footer: `
+      <button class="btn btn-secondary" id="modal-cancel">Annuler</button>
+      <button class="btn btn-primary" id="modal-save" style="flex:1">Enregistrer</button>`,
+  });
+
+  document.getElementById('modal-cancel')?.addEventListener('click', () => {
+    document.getElementById('modal-overlay').classList.add('hidden');
+  });
+
+  document.getElementById('modal-save')?.addEventListener('click', async () => {
+    const nom      = document.getElementById('repas-nom')?.value.trim();
+    const calories = parseFloat(document.getElementById('repas-cal')?.value)  || 0;
+    const proteines= parseFloat(document.getElementById('repas-prot')?.value) || 0;
+    const glucides = parseFloat(document.getElementById('repas-gluc')?.value) || 0;
+    const lipides  = parseFloat(document.getElementById('repas-lip')?.value)  || 0;
+
+    if (!nom) { showToast('Entrez un nom de repas', 'warning'); return; }
+
+    try {
+      await supabase.from('nutrition').insert({
+        user_id: currentUser.id,
+        date: todayStr(),
+        nom, calories, proteines, glucides, lipides,
+      });
+      document.getElementById('modal-overlay').classList.add('hidden');
+      showToast('Repas ajouté !', 'success');
+      await renderJournal(section, todayStr());
+    } catch {
+      showToast('Erreur lors de l\'enregistrement', 'error');
+    }
+  });
+}

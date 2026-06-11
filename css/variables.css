@@ -1,0 +1,119 @@
+/* ── Tokens communs ─────────────────────────────────────────────── */
+:root {
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-size-xs:   0.75rem;
+  --font-size-sm:   0.875rem;
+  --font-size-md:   1rem;
+  --font-size-lg:   1.125rem;
+  --font-size-xl:   1.25rem;
+  --font-size-2xl:  1.5rem;
+  --font-size-3xl:  1.875rem;
+
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  18px;
+  --radius-full: 9999px;
+
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.25rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  --header-height:  56px;
+  --nav-height:     64px;
+  --safe-bottom:    env(safe-area-inset-bottom, 0px);
+
+  --transition-fast:   120ms ease;
+  --transition-base:   220ms ease;
+  --transition-slow:   380ms ease;
+
+  /* Couleurs d'état */
+  --color-success:       #22c55e;
+  --color-success-light: rgba(34, 197, 94, 0.14);
+  --color-warning:       #f59e0b;
+  --color-warning-light: rgba(245, 158, 11, 0.14);
+  --color-error:         #ef4444;
+  --color-error-light:   rgba(239, 68, 68, 0.14);
+  --color-info:          #3b82f6;
+  --color-info-light:    rgba(59, 130, 246, 0.14);
+
+  /* Couleur primaire — rouge Hevy */
+  --color-primary:       #e8432a;
+  --color-primary-hover: #d63620;
+  --color-primary-light: rgba(232, 67, 42, 0.14);
+  --color-primary-grad:  linear-gradient(135deg, #e8432a 0%, #f06442 100%);
+
+  /* Couleur secondaire */
+  --color-accent:        #ff8c42;
+  --color-accent-light:  rgba(255, 140, 66, 0.14);
+}
+
+/* ── Thème sombre (défaut) ──────────────────────────────────────── */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-base:       #0f0f0f;
+  --bg-secondary:  #161616;
+  --surface:       #1e1e1e;
+  --surface-2:     #262626;
+  --surface-3:     #2e2e2e;
+  --border:        rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  --text-primary:   #f2f2f2;
+  --text-secondary: #a0a0a0;
+  --text-muted:     #5a5a5a;
+  --text-inverse:   #0f0f0f;
+
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.5);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.6);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,0.7);
+  --shadow-xl: 0 16px 48px rgba(0,0,0,0.8);
+
+  --scrollbar-thumb: #2e2e2e;
+  --scrollbar-track: #1e1e1e;
+
+  --nav-bg:    rgba(14, 14, 14, 0.96);
+  --header-bg: rgba(15, 15, 15, 0.94);
+
+  --chart-grid:    rgba(255,255,255,0.05);
+  --chart-tooltip: #262626;
+}
+
+/* ── Thème clair ────────────────────────────────────────────────── */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-base:       #f0f0f0;
+  --bg-secondary:  #e8e8e8;
+  --surface:       #ffffff;
+  --surface-2:     #f6f6f6;
+  --surface-3:     #eeeeee;
+  --border:        rgba(0, 0, 0, 0.07);
+  --border-strong: rgba(0, 0, 0, 0.14);
+
+  --text-primary:   #111111;
+  --text-secondary: #555555;
+  --text-muted:     #999999;
+  --text-inverse:   #f2f2f2;
+
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.07);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.09);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,0.11);
+  --shadow-xl: 0 16px 48px rgba(0,0,0,0.14);
+
+  --scrollbar-thumb: #d0d0d0;
+  --scrollbar-track: #f0f0f0;
+
+  --nav-bg:    rgba(255, 255, 255, 0.94);
+  --header-bg: rgba(240, 240, 240, 0.94);
+
+  --chart-grid:    rgba(0,0,0,0.05);
+  --chart-tooltip: #ffffff;
+}
