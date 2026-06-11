@@ -152,17 +152,15 @@ h1, h2, h3, h4, h5, h6 {
 
 .auth-logo-icon { width: 110px; height: 110px; }
 
-/* Logo SVG phoenix — halo feu intense */
+/* Logo PNG fond transparent — halo feu */
 .auth-app-icon {
-  width: 110px;
-  height: 110px;
-  border-radius: 32px;
+  width: 130px;
+  height: 130px;
   object-fit: contain;
-  background: radial-gradient(circle at 50% 60%, rgba(255,80,0,0.18) 0%, transparent 70%);
   filter:
-    drop-shadow(0 0 12px rgba(255, 100, 0, 0.90))
-    drop-shadow(0 0 30px rgba(220, 50, 0, 0.55))
-    drop-shadow(0 0 60px rgba(180, 20, 0, 0.30));
+    drop-shadow(0 0 14px rgba(255, 100, 0, 0.85))
+    drop-shadow(0 0 36px rgba(220, 50, 0, 0.50))
+    drop-shadow(0 0 70px rgba(180, 20, 0, 0.28));
 }
 
 .auth-logo h1 {
