@@ -1,4 +1,4 @@
-const CACHE_NAME = 'esse-v2';
+const CACHE_NAME = 'esse-v3';
 const STATIC_ASSETS = [
   '/esse-app/',
   '/esse-app/index.html',
@@ -22,6 +22,7 @@ const STATIC_ASSETS = [
   '/esse-app/pages/profil.js',
   '/esse-app/pages/onboarding.js',
   '/esse-app/components/timer.js',
+  '/esse-app/icons/logo.png',
   '/esse-app/icons/icon-192.png',
   '/esse-app/icons/icon-512.png',
   '/esse-app/icons/icon-180.png',
