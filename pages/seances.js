@@ -76,7 +76,13 @@ async function _loadList(section, filter) {
     content.innerHTML = `<div class="item-list">${data.map(_seanceItem).join('')}</div>`;
 
     content.querySelectorAll('[data-seance-id]').forEach(item => {
-      item.addEventListener('click', () => _openSeanceDetail(item.dataset.seanceId, item.dataset.seanceNom));
+      item.addEventListener('click', () => _openSeanceDetail(item.dataset.seanceId, item.dataset.seanceNom, section));
+    });
+    content.querySelectorAll('[data-del-seance]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        _deleteSeance(btn.dataset.delSeance, btn.dataset.delNom, () => _loadList(section, filter));
+      });
     });
   } catch {
     content.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:var(--space-6)">Erreur de chargement</p>`;
@@ -100,10 +106,27 @@ function _seanceItem(s) {
           ? `<p class="item-meta-primary">${formatDuration(s.duree_minutes)}</p>`
           : `<p class="item-meta-secondary">—</p>`}
       </div>
-      <div class="item-arrow">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
+      <button class="icon-btn" data-del-seance="${s.id}" data-del-nom="${s.nom}"
+        aria-label="Supprimer" style="color:var(--color-error);flex-shrink:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
+        </svg>
+      </button>
     </div>`;
+}
+
+// ── Suppression d'une séance ──────────────────────────────────────────
+
+async function _deleteSeance(id, nom, onDone) {
+  if (!confirm(`Supprimer "${nom}" ? Cette action est définitive.`)) return;
+  try {
+    const { error } = await supabase.from('seances').delete().eq('id', id);
+    if (error) throw error;
+    showToast('Séance supprimée', 'success');
+    onDone?.();
+  } catch {
+    showToast('Erreur lors de la suppression', 'error');
+  }
 }
 
 // ── Onglet Calendrier ─────────────────────────────────────────────────
@@ -141,9 +164,9 @@ async function _renderCalendrier(section) {
           const daySessions = seances.filter(s => s.date === dateStr);
           if (!daySessions.length) return;
           if (daySessions.length === 1) {
-            _openSeanceDetail(daySessions[0].id, daySessions[0].nom);
+            _openSeanceDetail(daySessions[0].id, daySessions[0].nom, section);
           } else {
-            _openDaySessionsPicker(dateStr, daySessions);
+            _openDaySessionsPicker(dateStr, daySessions, section);
           }
         });
       });
@@ -235,7 +258,7 @@ function _calendarHTML(viewDate, seances) {
     </div>`;
 }
 
-function _openDaySessionsPicker(dateStr, sessions) {
+function _openDaySessionsPicker(dateStr, sessions, section) {
   const dateLabel = formatDate(dateStr, { weekday: 'long', year: true });
   openModal({
     title: dateLabel,
@@ -253,7 +276,7 @@ function _openDaySessionsPicker(dateStr, sessions) {
   document.querySelectorAll('[data-pick-id]').forEach(btn => {
     btn.addEventListener('click', () => {
       closeModal();
-      _openSeanceDetail(btn.dataset.pickId, btn.dataset.pickNom);
+      _openSeanceDetail(btn.dataset.pickId, btn.dataset.pickNom, section);
     });
   });
 }
@@ -394,8 +417,16 @@ function _openNewSeanceModal(section) {
 
 // ── Détail d'une séance ───────────────────────────────────────────────
 
-async function _openSeanceDetail(seanceId, seanceNom) {
-  openModal({ title: seanceNom || 'Détail', body: `<div style="padding:var(--space-4);text-align:center"><div class="spinner" style="margin:0 auto"></div></div>` });
+async function _openSeanceDetail(seanceId, seanceNom, section) {
+  openModal({
+    title: seanceNom || 'Détail',
+    body: `<div style="padding:var(--space-4);text-align:center"><div class="spinner" style="margin:0 auto"></div></div>`,
+    footer: `<button class="btn btn-secondary btn-full" id="btn-del-seance-detail" style="color:var(--color-error)">Supprimer cette séance</button>`,
+  });
+
+  document.getElementById('btn-del-seance-detail')?.addEventListener('click', () => {
+    _deleteSeance(seanceId, seanceNom, () => { closeModal(); if (section) loadSeances(section); });
+  });
 
   try {
     const { data: series } = await supabase

@@ -1,6 +1,6 @@
 import { initAuth, signIn, signUp, signOut, resetPassword, getUserPrenom, currentUser } from './auth.js';
 import { initRouter, registerPage, navigate } from './router.js';
-import { showToast, lsGet, lsSet } from './utils.js';
+import { showToast, lsGet, lsSet, openModal, closeModal } from './utils.js';
 import { exportAllData as exportData, importAllData } from './supabase.js';
 import { getProfilSummary } from '../pages/profil.js';
 
@@ -20,23 +20,123 @@ function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   const meta = document.getElementById('theme-meta');
   if (meta) meta.content = theme === 'dark' ? '#0f0f0f' : '#f0f0f0';
-
-  const sun  = document.querySelector('.icon-sun');
-  const moon = document.querySelector('.icon-moon');
-  if (sun)  sun.classList.toggle('hidden', theme === 'dark');
-  if (moon) moon.classList.toggle('hidden', theme === 'light');
-
   lsSet('theme', theme);
+}
+
+// ── Couleur d'accent ────────────────────────────────────────────────
+// Variantes sobres des couleurs classiques — pas de fluo, des teintes
+// profondes/désaturées qui restent lisibles en thème sombre et clair.
+
+const ACCENT_PALETTES = [
+  { id: 'braise',     label: 'Braise (défaut)', hex: '#E83000' },
+  { id: 'bordeaux',   label: 'Bordeaux',        hex: '#7A2E38' },
+  { id: 'marine',     label: 'Marine',          hex: '#1E3A5F' },
+  { id: 'emeraude',   label: 'Émeraude',        hex: '#2F6B4F' },
+  { id: 'ocre',       label: 'Ocre',            hex: '#B8860B' },
+  { id: 'aubergine',  label: 'Aubergine',       hex: '#5B3A6E' },
+  { id: 'petrole',    label: 'Pétrole',         hex: '#1F5B5B' },
+  { id: 'terracotta', label: 'Terracotta',      hex: '#A6633C' },
+  { id: 'vieux-rose', label: 'Vieux rose',      hex: '#9C5564' },
+  { id: 'ardoise',    label: 'Ardoise',         hex: '#51596B' },
+];
+const DEFAULT_ACCENT = ACCENT_PALETTES[0].hex;
+
+function _hexToRgb(hex) {
+  const v = hex.replace('#', '');
+  return [0, 2, 4].map(i => parseInt(v.substr(i, 2), 16));
+}
+function _mixHex(hex, withHex, amount) {
+  const [r1, g1, b1] = _hexToRgb(hex);
+  const [r2, g2, b2] = _hexToRgb(withHex);
+  const m = (a, b) => Math.round(a * (1 - amount) + b * amount);
+  return `rgb(${m(r1, r2)}, ${m(g1, g2)}, ${m(b1, b2)})`;
+}
+function _rgba(hex, a) {
+  const [r, g, b] = _hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
+function applyAccent(hex) {
+  const root  = document.documentElement.style;
+  const dark  = _mixHex(hex, '#000000', 0.32);
+  const hover = _mixHex(hex, '#000000', 0.18);
+  const light = _mixHex(hex, '#ffffff', 0.14);
+
+  root.setProperty('--color-primary',       hex);
+  root.setProperty('--color-primary-hover', hover);
+  root.setProperty('--color-primary-light', _rgba(hex, 0.12));
+  root.setProperty('--color-primary-glow',  _rgba(hex, 0.50));
+  root.setProperty('--color-primary-glow-s',_rgba(hex, 0.25));
+  root.setProperty('--color-primary-grad',  `linear-gradient(135deg, ${dark} 0%, ${hex} 48%, ${light} 100%)`);
+  root.setProperty('--color-primary-grad-v',`linear-gradient(180deg, ${dark} 0%, ${hex} 55%, ${light} 100%)`);
+  root.setProperty('--shadow-accent',       `0 8px 32px ${_rgba(hex, 0.50)}`);
+  root.setProperty('--shadow-accent-sm',    `0 4px 16px ${_rgba(hex, 0.38)}`);
+  root.setProperty('--border-focus',        _rgba(hex, 0.58));
+  root.setProperty('--border-ember',        _rgba(hex, 0.26));
+  root.setProperty('--chart-line',          hex);
+
+  lsSet('accent', hex);
 }
 
 function initTheme() {
   const saved = lsGet('theme');
   const preferred = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   applyTheme(saved || preferred);
+  applyAccent(lsGet('accent') || DEFAULT_ACCENT);
 
-  document.getElementById('theme-toggle')?.addEventListener('click', () => {
-    const current = document.documentElement.getAttribute('data-theme');
-    applyTheme(current === 'dark' ? 'light' : 'dark');
+  document.getElementById('appearance-btn')?.addEventListener('click', _openAppearanceModal);
+}
+
+function _appearanceModalBody() {
+  const theme  = document.documentElement.getAttribute('data-theme');
+  const accent = lsGet('accent') || DEFAULT_ACCENT;
+  return `
+    <div style="display:flex;flex-direction:column;gap:var(--space-5)">
+      <div>
+        <p class="form-label" style="margin-bottom:var(--space-3)">Mode</p>
+        <div style="display:flex;gap:var(--space-2)">
+          <button class="btn ${theme === 'dark' ? 'btn-primary' : 'btn-secondary'} appearance-mode-btn" data-mode="dark" style="flex:1">🌙 Sombre</button>
+          <button class="btn ${theme === 'light' ? 'btn-primary' : 'btn-secondary'} appearance-mode-btn" data-mode="light" style="flex:1">☀️ Clair</button>
+        </div>
+      </div>
+      <div>
+        <p class="form-label" style="margin-bottom:var(--space-3)">Couleur d'accent</p>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:var(--space-3)">
+          ${ACCENT_PALETTES.map(p => `
+            <button class="appearance-swatch" data-color="${p.hex}" title="${p.label}" aria-label="${p.label}"
+              style="aspect-ratio:1;border-radius:50%;background:${p.hex};cursor:pointer;
+                border:2px solid var(--surface);
+                box-shadow:${p.hex.toLowerCase() === accent.toLowerCase() ? '0 0 0 2px var(--text-primary)' : 'none'};
+                display:flex;align-items:center;justify-content:center">
+              ${p.hex.toLowerCase() === accent.toLowerCase() ? `
+                <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>` : ''}
+            </button>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+function _openAppearanceModal() {
+  openModal({ title: 'Apparence', body: _appearanceModalBody() });
+  _bindAppearanceModal();
+}
+
+function _bindAppearanceModal() {
+  document.querySelectorAll('.appearance-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      applyTheme(btn.dataset.mode);
+      document.getElementById('modal-body').innerHTML = _appearanceModalBody();
+      _bindAppearanceModal();
+    });
+  });
+  document.querySelectorAll('.appearance-swatch').forEach(btn => {
+    btn.addEventListener('click', () => {
+      applyAccent(btn.dataset.color);
+      document.getElementById('modal-body').innerHTML = _appearanceModalBody();
+      _bindAppearanceModal();
+    });
   });
 }
 

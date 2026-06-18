@@ -47,6 +47,10 @@ h1, h2, h3, h4, h5, h6 {
 .grid-2   { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 .grid-3   { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
 
+/* ── Sections de page — espacement vertical entre blocs ─────────────── */
+.page-section { margin-bottom: var(--space-6); }
+.page-section:last-child { margin-bottom: 0; }
+
 /* ── Structure app ───────────────────────────────────────────────── */
 .app {
   width: 100%;

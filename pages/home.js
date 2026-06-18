@@ -1,7 +1,7 @@
 import { currentUser, getUserPrenom } from '../js/auth.js';
 import { supabase }                   from '../js/supabase.js';
 import { navigate }                   from '../js/router.js';
-import { formatDate, getGreeting, todayStr, formatDuration, calc1RM } from '../js/utils.js';
+import { formatDate, getGreeting, todayStr, formatDuration, calc1RM, showToast } from '../js/utils.js';
 
 // ── Données du tableau de bord ────────────────────────────────────────
 
@@ -70,7 +70,7 @@ function renderLastSeances(seances) {
     return `<p style="color:var(--text-muted);font-size:var(--font-size-sm);text-align:center;padding:var(--space-4) 0">Aucune séance pour le moment</p>`;
   }
   return seances.map((s) => `
-    <div class="list-item clickable" data-id="${s.id}" onclick="navigateToSeance('${s.id}')">
+    <div class="list-item clickable" data-id="${s.id}">
       <div class="item-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/>
@@ -83,10 +83,25 @@ function renderLastSeances(seances) {
       <div class="item-meta">
         ${s.duree_minutes ? `<p class="item-meta-primary">${formatDuration(s.duree_minutes)}</p>` : ''}
       </div>
-      <div class="item-arrow">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
+      <button class="icon-btn" data-del-seance="${s.id}" data-del-nom="${s.nom || 'Séance'}"
+        aria-label="Supprimer" style="color:var(--color-error);flex-shrink:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
+        </svg>
+      </button>
     </div>`).join('');
+}
+
+async function deleteLastSeance(id, nom, section) {
+  if (!confirm(`Supprimer "${nom}" ? Cette action est définitive.`)) return;
+  try {
+    const { error } = await supabase.from('seances').delete().eq('id', id);
+    if (error) throw error;
+    showToast('Séance supprimée', 'success');
+    loadHome(section);
+  } catch {
+    showToast('Erreur lors de la suppression', 'error');
+  }
 }
 
 // ── Export de la page ─────────────────────────────────────────────────
@@ -210,5 +225,15 @@ export async function loadHome(section) {
 
   section.querySelectorAll('[data-nav]').forEach((btn) => {
     btn.addEventListener('click', () => navigate(btn.dataset.nav));
+  });
+
+  section.querySelectorAll('.item-list [data-id]').forEach((item) => {
+    item.addEventListener('click', () => navigate('seances'));
+  });
+  section.querySelectorAll('[data-del-seance]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteLastSeance(btn.dataset.delSeance, btn.dataset.delNom, section);
+    });
   });
 }
