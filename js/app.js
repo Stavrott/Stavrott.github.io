@@ -2,6 +2,7 @@ import { initAuth, signIn, signUp, signOut, resetPassword, getUserPrenom, curren
 import { initRouter, registerPage, navigate } from './router.js';
 import { showToast, lsGet, lsSet } from './utils.js';
 import { exportAllData as exportData, importAllData } from './supabase.js';
+import { getProfilSummary } from '../pages/profil.js';
 
 import { loadHome }        from '../pages/home.js';
 import { loadSeances }     from '../pages/seances.js';
@@ -11,7 +12,7 @@ import { loadNutrition }   from '../pages/nutrition.js';
 import { loadExercices }   from '../pages/exercices.js';
 import { loadProfil }      from '../pages/profil.js';
 import { initTimer }       from '../components/timer.js';
-import { initOnboarding, checkOnboardingDone } from '../pages/onboarding.js';
+import { initOnboarding, checkOnboardingDone, resetOnboardingDone } from '../pages/onboarding.js';
 
 // ── Thème ────────────────────────────────────────────────────────────
 
@@ -151,14 +152,28 @@ function initUserDrawer() {
   const drawer  = document.getElementById('user-drawer');
   const overlay = drawer.querySelector('.drawer-overlay');
 
-  document.getElementById('user-menu-btn')?.addEventListener('click', () => {
-    // Remplir les infos
+  document.getElementById('user-menu-btn')?.addEventListener('click', async () => {
     const user   = currentUser;
     const prenom = getUserPrenom();
     document.getElementById('drawer-avatar').textContent = prenom.charAt(0).toUpperCase();
     document.getElementById('drawer-name').textContent   = prenom;
     document.getElementById('drawer-email').textContent  = user?.email || '';
     drawer.classList.remove('hidden');
+
+    // Afficher le résumé du profil (objectif + niveau)
+    const badgesEl = document.getElementById('drawer-profile-badges');
+    if (badgesEl) {
+      badgesEl.innerHTML = '';
+      const summary = await getProfilSummary();
+      if (summary) {
+        [summary.objectifLabel, summary.niveauLabel].filter(Boolean).forEach(label => {
+          const span = document.createElement('span');
+          span.style.cssText = 'font-size:11px;padding:3px 10px;border-radius:999px;background:var(--color-primary-light);color:var(--color-primary);font-weight:700;white-space:nowrap';
+          span.textContent = label;
+          badgesEl.appendChild(span);
+        });
+      }
+    }
   });
 
   overlay.addEventListener('click', () => drawer.classList.add('hidden'));
@@ -275,6 +290,11 @@ function _onLoggedIn(user) {
     return;
   }
 
+  if (sessionStorage.getItem('force_onboarding') === '1') {
+    sessionStorage.removeItem('force_onboarding');
+    resetOnboardingDone(user.id);
+  }
+
   if (!checkOnboardingDone(user.id)) {
     document.getElementById('auth-screen').classList.add('hidden');
     const screen = document.getElementById('onboarding-screen');
@@ -311,7 +331,7 @@ function _initDemoButton() {
   section.classList.remove('hidden');
 
   btn.addEventListener('click', () => {
-    // S'assurer d'être sur l'onglet Connexion
+    sessionStorage.setItem('force_onboarding', '1');
     document.querySelector('.tab-btn[data-tab="login"]')?.click();
     const emailEl = document.getElementById('login-email');
     const pwdEl   = document.getElementById('login-password');

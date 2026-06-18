@@ -195,6 +195,7 @@
           <div>
             <p class="user-name" id="drawer-name">Utilisateur</p>
             <p class="user-email" id="drawer-email">—</p>
+            <div id="drawer-profile-badges" style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"></div>
           </div>
         </div>
         <div class="drawer-body">
@@ -273,15 +274,15 @@
       </div>
     </div>
 
-    <!-- ── Toasts ───────────────────────────────────────────────── -->
-    <div id="toast-container" class="toast-container" role="status" aria-live="polite"></div>
-
     <!-- ── Overlay de chargement ───────────────────────────────── -->
     <div id="loading-overlay" class="loading-overlay hidden" aria-live="assertive">
       <div class="spinner"></div>
     </div>
 
   </div>
+
+  <!-- ── Toasts — hors de #app pour rester toujours au premier plan ── -->
+  <div id="toast-container" class="toast-container" role="status" aria-live="polite"></div>
 
   <script type="module" src="js/app.js"></script>
 </body>

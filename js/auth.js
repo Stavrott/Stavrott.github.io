@@ -59,7 +59,7 @@ export async function signUp(email, password, prenom) {
         user_id: data.user.id,
         prenom,
         created_at: new Date().toISOString(),
-      });
+      }, { onConflict: 'user_id' });
     }
     return data.user;
   } finally {

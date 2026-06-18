@@ -3,6 +3,8 @@ import { supabase }               from '../js/supabase.js';
 import { navigate }               from '../js/router.js';
 import { showToast, openModal, closeModal, showLoading, hideLoading, emptyState } from '../js/utils.js';
 import { startSeance, addExercices } from './seance-active.js';
+import { openRoutineBuilder }     from './routine-builder.js';
+import { openRoutineView }        from './routine-view.js';
 
 // ── Programmes prédéfinis ─────────────────────────────────────────────
 
@@ -40,8 +42,11 @@ const PREDEFINED = [
 
 // ── État local ────────────────────────────────────────────────────────
 
-let _section   = null;
-let _activeTab = 'predefined';
+let _section      = null;
+let _activeTab    = 'routines';
+let _routinesData = [];
+
+const _ORDER_KEY = () => `routine_order_${currentUser?.id}`;
 
 // ── Point d'entrée ────────────────────────────────────────────────────
 
@@ -53,8 +58,9 @@ export async function loadProgrammes(section) {
 function _render() {
   _section.innerHTML = `
     <div class="tabs" id="prog-tabs">
+      <button class="tab ${_activeTab === 'routines'  ? 'active' : ''}" data-tab="routines">Mes routines</button>
       <button class="tab ${_activeTab === 'predefined' ? 'active' : ''}" data-tab="predefined">Prédéfinis</button>
-      <button class="tab ${_activeTab === 'custom'     ? 'active' : ''}" data-tab="custom">Mes programmes</button>
+      <button class="tab ${_activeTab === 'custom'     ? 'active' : ''}" data-tab="custom">Programmes</button>
     </div>
     <div id="prog-content"></div>`;
 
@@ -63,11 +69,255 @@ function _render() {
       _activeTab = tab.dataset.tab;
       _section.querySelectorAll('#prog-tabs .tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
-      _activeTab === 'predefined' ? _renderPredefined() : _renderCustom();
+      if (_activeTab === 'predefined') _renderPredefined();
+      else if (_activeTab === 'custom') _renderCustom();
+      else _renderRoutines();
     });
   });
 
-  _activeTab === 'predefined' ? _renderPredefined() : _renderCustom();
+  if (_activeTab === 'predefined') _renderPredefined();
+  else if (_activeTab === 'custom') _renderCustom();
+  else _renderRoutines();
+}
+
+// ── Onglet Mes routines ───────────────────────────────────────────────
+
+async function _renderRoutines() {
+  const content = _section.querySelector('#prog-content');
+  content.innerHTML = `
+    ${_skeletonList()}
+    <button class="btn btn-primary btn-full" id="btn-create-routine" style="margin-top:var(--space-4)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+        style="width:18px;height:18px">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Créer une routine
+    </button>`;
+
+  content.querySelector('#btn-create-routine')?.addEventListener('click', () => {
+    openRoutineBuilder(null, state => _saveRoutine(state));
+  });
+
+  try {
+    const { data, error } = await supabase
+      .from('routines').select('*').eq('user_id', currentUser.id)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+
+    // Appliquer l'ordre sauvegardé (localStorage)
+    const savedOrder = JSON.parse(localStorage.getItem(_ORDER_KEY()) ?? 'null');
+    _routinesData = savedOrder
+      ? [...savedOrder.map(id => data.find(r => r.id === id)).filter(Boolean),
+         ...data.filter(r => !savedOrder.includes(r.id))]
+      : (data ?? []);
+
+    const listEl = document.createElement('div');
+    if (!_routinesData.length) {
+      listEl.innerHTML = emptyState(
+        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/></svg>`,
+        'Aucune routine',
+        'Créez votre première routine pour commencer à vous entraîner.', null, null
+      );
+    } else {
+      listEl.innerHTML = `
+        <div id="routines-list" style="display:flex;flex-direction:column;gap:6px">
+          ${_routinesData.map(_routineItem).join('')}
+        </div>`;
+    }
+
+    content.querySelector('.skeleton-list-wrapper')?.replaceWith(listEl);
+
+    const rList = listEl.querySelector('#routines-list');
+    if (rList) {
+      // Clic sur la carte → visualisation
+      rList.addEventListener('click', e => {
+        if (e.target.closest('button')) return;
+        const item = e.target.closest('[data-rid]');
+        if (!item) return;
+        const r = _routinesData.find(x => x.id === item.dataset.rid);
+        if (r) _openView(r);
+      });
+      // Boutons modifier / supprimer
+      rList.addEventListener('click', e => {
+        const edit = e.target.closest('[data-edit-routine]');
+        if (edit) {
+          e.stopPropagation();
+          const r = _routinesData.find(x => x.id === edit.dataset.editRoutine);
+          if (r) openRoutineBuilder({ id: r.id, nom: r.nom, exercices: r.exercices }, state => _saveRoutine(state));
+        }
+        const del = e.target.closest('[data-del-routine]');
+        if (del) {
+          e.stopPropagation();
+          const r = _routinesData.find(x => x.id === del.dataset.delRoutine);
+          if (r) _deleteRoutine(r);
+        }
+      });
+      _makeDraggable(rList);
+    }
+
+  } catch {
+    content.querySelector('.skeleton-list-wrapper')?.remove();
+    content.insertAdjacentHTML('afterbegin',
+      `<p style="color:var(--text-muted);text-align:center;padding:var(--space-4)">Erreur de chargement</p>`);
+  }
+}
+
+function _openView(r) {
+  openRoutineView(r, {
+    onEdit:  () => openRoutineBuilder({ id: r.id, nom: r.nom, exercices: r.exercices }, state => _saveRoutine(state)),
+    onStart: () => _lancerRoutine(r),
+  });
+}
+
+async function _lancerRoutine(routine) {
+  showLoading();
+  try {
+    const nom     = routine.nom;
+    const section = document.getElementById('page-seances');
+    await startSeance(nom, section, () => navigate('seances'));
+    await addExercices((routine.exercices ?? []).map(ex => ex.nom));
+    navigate('seances');
+  } catch {
+    showToast('Erreur lors du lancement de la séance', 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function _routineItem(r) {
+  const nbExos   = (r.exercices ?? []).length;
+  const nbSeries = (r.exercices ?? []).reduce((a, ex) => a + (ex.series?.length ?? 0), 0);
+  return `
+    <div class="list-item" data-rid="${r.id}" draggable="true"
+      style="cursor:pointer;gap:10px;user-select:none">
+      <div class="drag-handle" title="Réorganiser"
+        style="cursor:grab;color:var(--text-muted);flex-shrink:0;padding:2px;touch-action:none">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;display:block;pointer-events:none">
+          <circle cx="9"  cy="5"  r="1.4"/><circle cx="9"  cy="12" r="1.4"/><circle cx="9"  cy="19" r="1.4"/>
+          <circle cx="15" cy="5"  r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="15" cy="19" r="1.4"/>
+        </svg>
+      </div>
+      <div class="item-icon" style="background:var(--color-primary-light);color:var(--color-primary);flex-shrink:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/>
+        </svg>
+      </div>
+      <div class="item-body">
+        <p class="item-title">${r.nom}</p>
+        <p class="item-subtitle">${nbExos} exercice${nbExos!==1?'s':''} · ${nbSeries} série${nbSeries!==1?'s':''}</p>
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        <button class="icon-btn" data-edit-routine="${r.id}" title="Modifier">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+        <button class="icon-btn" data-del-routine="${r.id}" title="Supprimer" style="color:var(--color-error)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+          </svg>
+        </button>
+      </div>
+    </div>`;
+}
+
+// ── Drag & Drop routines ──────────────────────────────────────────────
+
+function _makeDraggable(list) {
+  let src = null;
+
+  // ── Desktop (HTML5 DnD) ──
+  list.addEventListener('dragstart', e => {
+    src = e.target.closest('[data-rid]');
+    if (!src) return;
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => { if (src) src.style.opacity = '0.4'; }, 0);
+  });
+  list.addEventListener('dragend', () => {
+    if (src) src.style.opacity = '';
+    src = null;
+    _saveOrderFromDOM(list);
+  });
+  list.addEventListener('dragover', e => {
+    e.preventDefault();
+    if (!src) return;
+    const target = e.target.closest('[data-rid]');
+    if (!target || target === src) return;
+    const mid = target.getBoundingClientRect().top + target.getBoundingClientRect().height / 2;
+    if (e.clientY < mid) list.insertBefore(src, target);
+    else target.after(src);
+  });
+
+  // ── Mobile (touch) ──
+  let touchSrc = null, touchScroll = false;
+
+  list.addEventListener('touchstart', e => {
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+    touchSrc    = handle.closest('[data-rid]');
+    touchScroll = false;
+    touchSrc.style.opacity = '0.4';
+  }, { passive: true });
+
+  list.addEventListener('touchmove', e => {
+    if (!touchSrc) return;
+    e.preventDefault();
+    const touch   = e.touches[0];
+    const items   = [...list.querySelectorAll('[data-rid]')].filter(i => i !== touchSrc);
+    for (const item of items) {
+      const r = item.getBoundingClientRect();
+      if (touch.clientY < r.top + r.height / 2) { list.insertBefore(touchSrc, item); return; }
+    }
+    list.appendChild(touchSrc);
+  }, { passive: false });
+
+  list.addEventListener('touchend', () => {
+    if (!touchSrc) return;
+    touchSrc.style.opacity = '';
+    touchSrc = null;
+    _saveOrderFromDOM(list);
+  });
+}
+
+function _saveOrderFromDOM(list) {
+  const ids = [...list.querySelectorAll('[data-rid]')].map(el => el.dataset.rid);
+  localStorage.setItem(_ORDER_KEY(), JSON.stringify(ids));
+  const byId = Object.fromEntries(_routinesData.map(r => [r.id, r]));
+  _routinesData = ids.map(id => byId[id]).filter(Boolean);
+}
+
+async function _saveRoutine(state) {
+  showLoading();
+  try {
+    const payload = { nom: state.nom, exercices: state.exercices, user_id: currentUser.id };
+    if (state.id) {
+      const { error } = await supabase.from('routines').update({ nom: payload.nom, exercices: payload.exercices }).eq('id', state.id);
+      if (error) throw error;
+      showToast('Routine mise à jour !', 'success');
+    } else {
+      const { error } = await supabase.from('routines').insert(payload);
+      if (error) throw error;
+      showToast('Routine créée !', 'success');
+    }
+    _activeTab = 'routines';
+    _render();
+  } catch {
+    showToast('Erreur lors de la sauvegarde', 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+async function _deleteRoutine(routine) {
+  if (!confirm(`Supprimer la routine "${routine.nom}" ?`)) return;
+  try {
+    await supabase.from('routines').delete().eq('id', routine.id);
+    showToast('Routine supprimée', 'success');
+    _renderRoutines();
+  } catch {
+    showToast('Erreur lors de la suppression', 'error');
+  }
 }
 
 // ── Onglet Prédéfinis ─────────────────────────────────────────────────

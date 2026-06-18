@@ -1,4 +1,4 @@
-const CACHE_NAME = 'esse-v3';
+const CACHE_NAME = 'esse-v4';
 const STATIC_ASSETS = [
   '/esse-app/',
   '/esse-app/index.html',
@@ -12,9 +12,14 @@ const STATIC_ASSETS = [
   '/esse-app/js/supabase.js',
   '/esse-app/js/auth.js',
   '/esse-app/js/utils.js',
+  '/esse-app/js/metrics.js',
+  '/esse-app/js/exercisedb.js',
   '/esse-app/pages/home.js',
   '/esse-app/pages/seances.js',
   '/esse-app/pages/seance-active.js',
+  '/esse-app/pages/seance.js',
+  '/esse-app/pages/routine-builder.js',
+  '/esse-app/pages/routine-view.js',
   '/esse-app/pages/programmes.js',
   '/esse-app/pages/stats.js',
   '/esse-app/pages/nutrition.js',

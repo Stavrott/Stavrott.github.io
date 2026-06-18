@@ -8,14 +8,18 @@ export function checkOnboardingDone(userId) {
   return lsGet(LS_KEY(userId)) === true;
 }
 
+export function resetOnboardingDone(userId) {
+  lsSet(LS_KEY(userId), false);
+}
+
 // ── Données des étapes ─────────────────────────────────────────────────
 
 const OBJECTIFS = [
-  { value: 'masse',     label: 'Prise de masse',         desc: 'Développer votre musculature' },
-  { value: 'force',     label: 'Force',                  desc: 'Soulever plus lourd' },
-  { value: 'seche',     label: 'Sèche',                  desc: 'Perdre du gras, garder le muscle' },
-  { value: 'endurance', label: 'Endurance musculaire',   desc: 'Améliorer votre résistance' },
-  { value: 'maintien',  label: 'Maintien',               desc: 'Rester en forme' },
+  { value: 'hypertrophie', label: 'Prise de masse',       desc: 'Développer votre musculature' },
+  { value: 'force',        label: 'Force',                desc: 'Soulever plus lourd' },
+  { value: 'seche',        label: 'Sèche',                desc: 'Perdre du gras, garder le muscle' },
+  { value: 'endurance',    label: 'Endurance musculaire', desc: 'Améliorer votre résistance' },
+  { value: 'maintenance',  label: 'Maintien',             desc: 'Rester en forme' },
 ];
 
 const NIVEAUX = [
@@ -328,7 +332,7 @@ async function _finish() {
 
   try {
     const user = currentUser;
-    await supabase.from('profils').upsert({
+    const { error: upsertErr } = await supabase.from('profils').upsert({
       user_id:     user.id,
       prenom:      _data.prenom || null,
       poids_kg:    _data.poids_kg,
@@ -340,17 +344,21 @@ async function _finish() {
       frequence:   _data.frequence,
       lieu:        _data.lieu || null,
       equipements: _data.equipements,
-    });
+    }, { onConflict: 'user_id' });
+
+    if (upsertErr) throw upsertErr;
 
     if (_data.poids_kg) {
-      await supabase.from('historique_poids').upsert({
-        user_id:  user.id,
-        date:     new Date().toISOString().split('T')[0],
-        poids_kg: _data.poids_kg,
-      }, { onConflict: 'user_id,date' }).catch(() => {});
+      try {
+        await supabase.from('historique_poids').upsert({
+          user_id:  user.id,
+          date:     new Date().toISOString().split('T')[0],
+          poids_kg: _data.poids_kg,
+        }, { onConflict: 'user_id,date' });
+      } catch { /* non bloquant */ }
     }
-  } catch {
-    // Non bloquant
+  } catch(err) {
+    showToast(`Erreur sauvegarde profil : ${err?.message ?? err}`, 'error', 6000);
   }
 
   lsSet(LS_KEY(currentUser.id), true);

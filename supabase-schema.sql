@@ -143,3 +143,12 @@ create index if not exists idx_seances_user_date    on seances(user_id, date des
 create index if not exists idx_series_seance        on series(seance_id);
 create index if not exists idx_series_user_exo      on series(user_id, exercice_nom);
 create index if not exists idx_nutrition_user_date  on nutrition(user_id, date desc);
+
+-- ── Métriques dynamiques par type d'exercice (cardio / isométrique) ────
+-- poids_kg / repetitions restent utilisées pour le type 'kg_reps' (défaut).
+-- Ces colonnes sont nullable et additives : aucun impact sur les données existantes.
+alter table series           add column if not exists duree_s         integer;
+alter table series           add column if not exists vitesse_kmh     numeric(5,2);
+alter table series           add column if not exists inclinaison_pct numeric(4,1);
+alter table series           add column if not exists resistance      numeric(5,1);
+alter table exercices_custom add column if not exists type_metrique   text default 'kg_reps';
