@@ -359,6 +359,23 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ══════════════════════════════════════════════════════════════════
+   FAB (bouton d'action flottant)
+   ══════════════════════════════════════════════════════════════════ */
+.fab {
+  position: fixed;
+  right: var(--space-5);
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + var(--space-4));
+  width: 56px; height: 56px; border-radius: var(--radius-full);
+  background: var(--color-primary-grad); color: white;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-accent);
+  transition: all var(--transition-fast);
+  z-index: 90;
+}
+.fab:hover  { filter: brightness(1.12); transform: scale(1.04); }
+.fab:active { transform: scale(0.92); }
+
+/* ══════════════════════════════════════════════════════════════════
    NAVIGATION INFÉRIEURE
    — Calqué sur référence : couleur seule change, fine ligne accent
    ══════════════════════════════════════════════════════════════════ */

@@ -190,6 +190,27 @@
   box-shadow: 0 1px 4px rgba(0,0,0,0.40);
 }
 
+.tabs {
+  display: flex; gap: 2px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: 3px; margin-bottom: var(--space-5);
+}
+.tab {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  border-radius: calc(var(--radius-lg) - 3px);
+  font-size: var(--font-size-xs); font-weight: 700;
+  color: var(--text-muted); text-align: center;
+  cursor: pointer; transition: all var(--transition-fast);
+  letter-spacing: 0.01em;
+}
+.tab.active {
+  background: var(--surface-2);
+  color: var(--text-primary);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.40);
+}
+
 /* ══════════════════════════════════════════════════════════════════
    BARRE DE RECHERCHE
    ══════════════════════════════════════════════════════════════════ */

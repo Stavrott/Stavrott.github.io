@@ -113,6 +113,13 @@ async function renderJournal(section, date) {
             : (repas ?? []).map(renderRepasItem).join('')}
         </div>
       </div>`;
+
+    content.querySelectorAll('[data-del-repas]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteRepas(section, btn.dataset.delRepas, btn.dataset.delNom);
+      });
+    });
   } catch {
     content.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:var(--space-6)">Erreur de chargement</p>`;
   }
@@ -134,14 +141,87 @@ function renderRepasItem(r) {
       <div class="item-meta">
         <p class="item-meta-primary">${r.calories || 0} kcal</p>
       </div>
+      <button class="icon-btn" data-del-repas="${r.id}" data-del-nom="${r.nom || 'Repas'}"
+        aria-label="Supprimer" style="color:var(--color-error);flex-shrink:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
+        </svg>
+      </button>
     </div>`;
 }
 
-function renderObjectifs(section) {
+async function deleteRepas(section, id, nom) {
+  if (!confirm(`Supprimer "${nom}" ? Cette action est définitive.`)) return;
+  try {
+    const { error } = await supabase.from('nutrition').delete().eq('id', id);
+    if (error) throw error;
+    showToast('Repas supprimé', 'success');
+    await renderJournal(section, todayStr());
+  } catch {
+    showToast('Erreur lors de la suppression', 'error');
+  }
+}
+
+async function renderObjectifs(section) {
   const content = section.querySelector('#nutri-content');
-  content.innerHTML = `<p style="text-align:center;color:var(--text-muted);padding:var(--space-12);font-size:var(--font-size-sm)">
-    🎯 Configuration des objectifs caloriques et macro — à venir.
-  </p>`;
+  content.innerHTML = skeletonNutri();
+
+  try {
+    const { data: objectifs } = await supabase
+      .from('objectifs_nutrition')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+
+    const obj = objectifs || { calories: 2000, proteines: 150, glucides: 200, lipides: 70 };
+
+    content.innerHTML = `
+      <div class="page-section">
+        <h3 class="section-title" style="margin-bottom:var(--space-3)">Objectifs quotidiens</h3>
+        <div class="card" style="display:flex;flex-direction:column;gap:var(--space-4)">
+          <div class="form-group">
+            <label class="form-label">Calories (kcal)</label>
+            <input class="form-input" id="obj-cal" type="number" min="0" value="${obj.calories}">
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Protéines (g)</label>
+              <input class="form-input" id="obj-prot" type="number" min="0" value="${obj.proteines}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Glucides (g)</label>
+              <input class="form-input" id="obj-gluc" type="number" min="0" value="${obj.glucides}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Lipides (g)</label>
+              <input class="form-input" id="obj-lip" type="number" min="0" value="${obj.lipides}">
+            </div>
+          </div>
+          <button class="btn btn-primary btn-full" id="btn-save-objectifs">Enregistrer</button>
+        </div>
+      </div>`;
+
+    content.querySelector('#btn-save-objectifs')?.addEventListener('click', async () => {
+      const calories  = parseFloat(content.querySelector('#obj-cal')?.value)  || 0;
+      const proteines = parseFloat(content.querySelector('#obj-prot')?.value) || 0;
+      const glucides  = parseFloat(content.querySelector('#obj-gluc')?.value) || 0;
+      const lipides   = parseFloat(content.querySelector('#obj-lip')?.value)  || 0;
+
+      try {
+        const { error } = await supabase.from('objectifs_nutrition').upsert({
+          user_id: currentUser.id,
+          calories, proteines, glucides, lipides,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+        if (error) throw error;
+        showToast('Objectifs enregistrés !', 'success');
+      } catch {
+        showToast('Erreur lors de l\'enregistrement', 'error');
+      }
+    });
+  } catch {
+    content.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:var(--space-6)">Erreur de chargement</p>`;
+  }
 }
 
 function openAddRepasModal(section) {
