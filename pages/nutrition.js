@@ -1,7 +1,7 @@
 // Page Nutrition — calories, macros, micro-nutriments
 import { currentUser }  from '../js/auth.js';
 import { supabase }     from '../js/supabase.js';
-import { showToast, todayStr, formatDate, openModal } from '../js/utils.js';
+import { showToast, todayStr, formatDate, openModal, confirmDialog } from '../js/utils.js';
 
 export async function loadNutrition(section) {
   section.innerHTML = `
@@ -151,7 +151,7 @@ function renderRepasItem(r) {
 }
 
 async function deleteRepas(section, id, nom) {
-  if (!confirm(`Supprimer "${nom}" ? Cette action est définitive.`)) return;
+  if (!await confirmDialog(`Supprimer "${nom}" ? Cette action est définitive.`)) return;
   try {
     const { error } = await supabase.from('nutrition').delete().eq('id', id);
     if (error) throw error;

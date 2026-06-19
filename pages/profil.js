@@ -1,6 +1,6 @@
 import { currentUser, getUserPrenom } from '../js/auth.js';
 import { supabase }  from '../js/supabase.js';
-import { showToast, todayStr } from '../js/utils.js';
+import { showToast, todayStr, confirmDialog } from '../js/utils.js';
 
 const OBJECTIFS = [
   { value: 'hypertrophie', label: 'Prise de masse',    desc: 'Développer la masse musculaire' },
@@ -509,7 +509,7 @@ function _openPoidsModal(isUpdate, section) {
 // ── Supprimer une entrée de poids ─────────────────────────────────────
 
 async function _deletePoids(date, section) {
-  if (!confirm('Supprimer cette mesure ?')) return;
+  if (!await confirmDialog('Supprimer cette mesure ?')) return;
   try {
     await supabase.from('historique_poids').delete()
       .eq('user_id', currentUser.id).eq('date', date);

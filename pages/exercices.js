@@ -1,7 +1,7 @@
 import { currentUser }  from '../js/auth.js';
 import { supabase }      from '../js/supabase.js';
 import { debounce, openModal, closeModal, showToast, showLoading, hideLoading, emptyState,
-         calc1RM, formatDate, todayStr, lsGet, lsSet, svgLineChart } from '../js/utils.js';
+         calc1RM, formatDate, todayStr, lsGet, lsSet, svgLineChart, confirmDialog } from '../js/utils.js';
 import { fetchExerciseImage } from '../js/exercisedb.js';
 import { METRIC_TYPES, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
 
@@ -719,7 +719,7 @@ async function _saveCustom() {
 }
 
 async function _deleteCustom(id) {
-  if (!confirm('Supprimer cet exercice ?')) return;
+  if (!await confirmDialog('Supprimer cet exercice ?')) return;
   try {
     await supabase.from('exercices_custom').delete().eq('id', id);
     _customCache = null;

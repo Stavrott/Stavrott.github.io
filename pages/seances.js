@@ -1,6 +1,6 @@
 import { currentUser }       from '../js/auth.js';
 import { supabase }           from '../js/supabase.js';
-import { showToast, formatDate, formatDuration, openModal, closeModal, emptyState, showLoading, hideLoading } from '../js/utils.js';
+import { showToast, formatDate, formatDuration, openModal, closeModal, emptyState, showLoading, hideLoading, confirmDialog } from '../js/utils.js';
 import { hasActiveSeance, startSeance, resumeActiveView } from './seance-active.js';
 
 // ── Chargement de la page ─────────────────────────────────────────────
@@ -118,7 +118,7 @@ function _seanceItem(s) {
 // ── Suppression d'une séance ──────────────────────────────────────────
 
 async function _deleteSeance(id, nom, onDone) {
-  if (!confirm(`Supprimer "${nom}" ? Cette action est définitive.`)) return;
+  if (!await confirmDialog(`Supprimer "${nom}" ? Cette action est définitive.`)) return;
   try {
     const { error } = await supabase.from('seances').delete().eq('id', id);
     if (error) throw error;

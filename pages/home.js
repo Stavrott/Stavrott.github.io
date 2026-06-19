@@ -1,7 +1,7 @@
 import { currentUser, getUserPrenom } from '../js/auth.js';
 import { supabase }                   from '../js/supabase.js';
 import { navigate }                   from '../js/router.js';
-import { formatDate, getGreeting, todayStr, formatDuration, calc1RM, showToast } from '../js/utils.js';
+import { formatDate, getGreeting, todayStr, formatDuration, calc1RM, showToast, confirmDialog } from '../js/utils.js';
 import { openQuickLaunchModal }       from '../js/quick-launch.js';
 
 // ── Données du tableau de bord ────────────────────────────────────────
@@ -94,7 +94,7 @@ function renderLastSeances(seances) {
 }
 
 async function deleteLastSeance(id, nom, section) {
-  if (!confirm(`Supprimer "${nom}" ? Cette action est définitive.`)) return;
+  if (!await confirmDialog(`Supprimer "${nom}" ? Cette action est définitive.`)) return;
   try {
     const { error } = await supabase.from('seances').delete().eq('id', id);
     if (error) throw error;

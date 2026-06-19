@@ -1,16 +1,18 @@
 import { currentUser }               from '../js/auth.js';
 import { supabase }                   from '../js/supabase.js';
-import { showToast, formatTime, openModal, closeModal } from '../js/utils.js';
+import { showToast, formatTime, openModal, closeModal, confirmDialog } from '../js/utils.js';
 import { startRestTimer }             from '../components/timer.js';
 import { APP_CONFIG }                 from '../js/config.js';
 
 // ── État global ───────────────────────────────────────────────────────
 
-let _state      = null; // { seance, exercices: [{nom, lastPerf, sets:[...]}] }
+let _state      = null; // { seance, routineId, exercices: [{nom, lastPerf, sets:[...]}] }
 let _section    = null;
 let _onFinish   = null;
 let _startTime  = null;
 let _elapsedId  = null;
+
+const _uid = () => Math.random().toString(36).slice(2, 10);
 
 export function hasActiveSeance()  { return _state !== null; }
 export function getActiveSeance()  { return _state?.seance ?? null; }
@@ -25,7 +27,7 @@ export async function startSeance(nom, section, onFinish) {
 
   if (error) throw error;
 
-  _state     = { seance: data, exercices: [] };
+  _state     = { seance: data, routineId: null, exercices: [] };
   _section   = section;
   _onFinish  = onFinish;
   _startTime = Date.now();
@@ -161,14 +163,14 @@ function _bindEvents() {
   cardList?.addEventListener('input',  _onInputChange);
 }
 
-function _onCardClick(e) {
+async function _onCardClick(e) {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
   const { action, exo, set: setIdx } = btn.dataset;
   const ei = parseInt(exo);
   const si = parseInt(setIdx);
 
-  if (action === 'remove-exo')  _removeExo(ei);
+  if (action === 'remove-exo')  await _removeExo(ei);
   if (action === 'add-serie')   _addSerie(ei);
   if (action === 'toggle-done') _toggleDone(ei, si);
 }
@@ -230,8 +232,41 @@ export async function addExercices(noms) {
   render();
 }
 
-function _removeExo(ei) {
-  if (!confirm(`Supprimer "${_state.exercices[ei]?.nom}" de la séance ?`)) return;
+// Lance les exercices d'une routine en reprenant ses séries planifiées
+// (poids/reps configurés dans le builder) plutôt que l'historique seul —
+// la routine fait ensuite office de plan, mis à jour en fin de séance
+// pour refléter ce qui a été réellement soulevé (voir _syncRoutineProgress).
+export async function addExercicesFromRoutine(routine) {
+  _state.routineId = routine?.id ?? null;
+  const exercices = routine?.exercices ?? [];
+  if (!exercices.length) return;
+
+  const perfs = await Promise.all(exercices.map(ex => _fetchLastPerf(ex.nom)));
+
+  exercices.forEach((ex, i) => {
+    const isKgReps      = !ex.type_metrique || ex.type_metrique === 'kg_reps';
+    const plannedSeries = isKgReps && ex.series?.length ? ex.series : null;
+
+    const sets = plannedSeries
+      ? plannedSeries.map(s => ({
+          poids: s.poids ?? null,
+          reps:  s.reps  ?? null,
+          repos: null, done: false, dbId: null,
+        }))
+      : [{
+          poids: perfs[i]?.sets?.[0]?.poids_kg    ?? null,
+          reps:  perfs[i]?.sets?.[0]?.repetitions ?? null,
+          repos: null, done: false, dbId: null,
+        }];
+
+    _state.exercices.push({ nom: ex.nom, lastPerf: perfs[i]?.summary ?? null, sets });
+  });
+
+  render();
+}
+
+async function _removeExo(ei) {
+  if (!await confirmDialog(`Supprimer "${_state.exercices[ei]?.nom}" de la séance ?`)) return;
   _state.exercices.splice(ei, 1);
   render();
 }
@@ -423,7 +458,7 @@ async function _confirmFinish() {
   const duree     = _elapsedMinutes();
 
   if (!_state.exercices.length) {
-    if (confirm('Aucun exercice enregistré. Annuler la séance ?')) {
+    if (await confirmDialog('Aucun exercice enregistré. Annuler la séance ?', { confirmLabel: 'Annuler la séance' })) {
       await supabase.from('seances').delete().eq('id', _state.seance.id).catch(() => {});
       _reset();
     }
@@ -464,11 +499,41 @@ async function _doFinish(duree) {
   const notes = document.getElementById('seance-notes-final')?.value.trim() || null;
   try {
     await supabase.from('seances').update({ duree_minutes: duree, notes }).eq('id', _state.seance.id);
+    await _syncRoutineProgress();
     showToast(`Séance terminée — ${duree} min`, 'success', 4000);
   } catch {
     showToast('Erreur lors de la finalisation', 'error');
   }
   _reset();
+}
+
+// Met à jour les séries planifiées de la routine d'origine avec ce qui a
+// réellement été soulevé, pour que le prochain lancement reflète la
+// progression (ex: routine prévue à 12kg, mais 14kg réellement faits).
+async function _syncRoutineProgress() {
+  if (!_state.routineId) return;
+  try {
+    const { data: routine, error } = await supabase
+      .from('routines').select('exercices').eq('id', _state.routineId).single();
+    if (error || !routine) return;
+
+    const exercices = (routine.exercices ?? []).map(ex => {
+      if (ex.type_metrique && ex.type_metrique !== 'kg_reps') return ex;
+      const performed = _state.exercices.find(e => e.nom === ex.nom);
+      if (!performed) return ex;
+
+      const series = performed.sets.map((s, i) => ({
+        ...(ex.series?.[i] ?? { uid: _uid(), repos: 90, fait: false }),
+        poids: s.poids,
+        reps:  s.reps,
+      }));
+      return { ...ex, series };
+    });
+
+    await supabase.from('routines').update({ exercices }).eq('id', _state.routineId);
+  } catch {
+    // Synchronisation best-effort — ne doit jamais bloquer la fin de séance.
+  }
 }
 
 function _reset() {

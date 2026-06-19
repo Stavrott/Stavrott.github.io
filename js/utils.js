@@ -57,6 +57,29 @@ export function closeModal() {
   document.body.style.overflow = '';
 }
 
+// ── Dialogue de confirmation (remplace window.confirm) ─────────────────
+
+export function confirmDialog(message, opts = {}) {
+  const { title = 'Confirmer', confirmLabel = 'Supprimer', cancelLabel = 'Annuler', danger = true } = opts;
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (val) => { if (!resolved) { resolved = true; resolve(val); } };
+
+    const close = openModal({
+      title,
+      body: `<p style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:1.6">${message}</p>`,
+      footer: `
+        <button class="btn btn-secondary" id="confirm-cancel">${cancelLabel}</button>
+        <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="confirm-ok" style="flex:1">${confirmLabel}</button>`,
+      onClose: () => finish(false),
+    });
+
+    document.getElementById('confirm-cancel')?.addEventListener('click', close);
+    document.getElementById('confirm-ok')?.addEventListener('click', () => { finish(true); close(); });
+  });
+}
+
 // ── Formatage ────────────────────────────────────────────────────────
 
 export function formatDate(dateStr, options = {}) {

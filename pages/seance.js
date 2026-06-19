@@ -1,6 +1,6 @@
 import { supabase }           from '../js/supabase.js';
 import { currentUser }         from '../js/auth.js';
-import { showToast }           from '../js/utils.js';
+import { showToast, confirmDialog } from '../js/utils.js';
 import { fetchExerciseImage }  from '../js/exercisedb.js';
 import { metricFields, parseFieldValue, defaultFieldValue, fieldByKey, FIELD_DB_COLUMN, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
 
@@ -372,8 +372,8 @@ function _htmlSsRound(exos, r, GRID, nCols, sameType) {
 // ── Events ────────────────────────────────────────────────────────────────
 
 function _bindEvents() {
-  _el.querySelector('#sc-back')?.addEventListener('click', () => {
-    if (!_totalDone() || confirm('Quitter ? La séance ne sera pas sauvegardée.')) _close();
+  _el.querySelector('#sc-back')?.addEventListener('click', async () => {
+    if (!_totalDone() || await confirmDialog('Quitter ? La séance ne sera pas sauvegardée.', { confirmLabel: 'Quitter', danger: false })) _close();
   });
 
   _el.querySelector('#sc-finish')?.addEventListener('click', async () => {

@@ -1,4 +1,4 @@
-import { showToast }           from '../js/utils.js';
+import { showToast, confirmDialog } from '../js/utils.js';
 import { getAllExercices }      from './exercices.js';
 import { fetchExerciseImage }  from '../js/exercisedb.js';
 import { metricFields, parseFieldValue, defaultFieldValue, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
@@ -230,8 +230,8 @@ function _sepHTML(ex) {
 // ── Événements ─────────────────────────────────────────────────────────
 
 function _bindEvents() {
-  _el.querySelector('#rb-back')?.addEventListener('click', () => {
-    if (!_state.exercices.length || confirm('Quitter sans sauvegarder ?')) _close();
+  _el.querySelector('#rb-back')?.addEventListener('click', async () => {
+    if (!_state.exercices.length || await confirmDialog('Quitter sans sauvegarder ?', { confirmLabel: 'Quitter', danger: false })) _close();
   });
   _el.querySelector('#rb-save')?.addEventListener('click', _save);
   _el.querySelector('#rb-add-exo')?.addEventListener('click', _pickExo);

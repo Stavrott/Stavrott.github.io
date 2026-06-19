@@ -1,8 +1,8 @@
 import { currentUser }            from '../js/auth.js';
 import { supabase }               from '../js/supabase.js';
 import { navigate }               from '../js/router.js';
-import { showToast, openModal, closeModal, showLoading, hideLoading, emptyState } from '../js/utils.js';
-import { startSeance, addExercices } from './seance-active.js';
+import { showToast, openModal, closeModal, showLoading, hideLoading, emptyState, confirmDialog } from '../js/utils.js';
+import { startSeance, addExercices, addExercicesFromRoutine } from './seance-active.js';
 import { openRoutineBuilder }     from './routine-builder.js';
 import { openRoutineView }        from './routine-view.js';
 
@@ -175,7 +175,7 @@ export async function lancerRoutine(routine) {
     const nom     = routine.nom;
     const section = document.getElementById('page-seances');
     await startSeance(nom, section, () => navigate('seances'));
-    await addExercices((routine.exercices ?? []).map(ex => ex.nom));
+    await addExercicesFromRoutine(routine);
     navigate('seances');
   } catch {
     showToast('Erreur lors du lancement de la séance', 'error');
@@ -310,7 +310,7 @@ async function _saveRoutine(state) {
 }
 
 async function _deleteRoutine(routine) {
-  if (!confirm(`Supprimer la routine "${routine.nom}" ?`)) return;
+  if (!await confirmDialog(`Supprimer la routine "${routine.nom}" ?`)) return;
   try {
     await supabase.from('routines').delete().eq('id', routine.id);
     showToast('Routine supprimée', 'success');
@@ -555,7 +555,7 @@ function _customProgItem(p) {
 // ── Supprimer un programme custom ─────────────────────────────────────
 
 async function _deleteCustomProg(prog) {
-  if (!confirm(`Supprimer le programme "${prog.nom}" ?`)) return;
+  if (!await confirmDialog(`Supprimer le programme "${prog.nom}" ?`)) return;
   try {
     await supabase.from('programmes').delete().eq('id', prog.id);
     showToast('Programme supprimé', 'success');
