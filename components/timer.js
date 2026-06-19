@@ -10,6 +10,7 @@ let totalTime  = 0;
 let endTime    = 0;       // timestamp absolu de fin — sert à corriger toute dérive
 let isRunning  = false;
 let minimized  = false;
+let audioCtx   = null;
 
 // ── Accesseurs DOM ─────────────────────────────────────────────────────
 
@@ -20,40 +21,39 @@ const ringFill  = () => document.getElementById('timer-ring-fill');
 const btnStart  = () => document.getElementById('timer-start-stop');
 const iconPlay  = () => document.querySelector('#timer-start-stop .icon-play');
 const iconPause = () => document.querySelector('#timer-start-stop .icon-pause');
-const miniBar   = () => document.getElementById('rest-timer-mini');
-const miniTime  = () => document.getElementById('rtm-time');
+
+// ── État exposé (lu par js/active-bar.js pour la barre flottante unifiée) ─
+
+export function isMinimized()        { return minimized; }
+export function getRemainingSeconds() { return remaining; }
+export function restoreTimer()        { restore(); }
 
 // ── Rendu ──────────────────────────────────────────────────────────────
 
 function updateDisplay() {
   const dispEl = display();
-  if (dispEl) {
-    dispEl.textContent = formatTime(remaining);
+  if (!dispEl) return;
 
-    const ratio = totalTime > 0 ? remaining / totalTime : 1;
-    let state = '';
-    if (ratio < 0.25)      state = 'done';
-    else if (ratio < 0.50) state = 'warning';
-    dispEl.className = 'timer-display' + (state ? ' ' + state : '');
+  dispEl.textContent = formatTime(remaining);
 
-    const ring = ringFill();
-    if (ring) {
-      const offset = CIRCUMFERENCE * (1 - ratio);
-      ring.style.strokeDashoffset = offset;
-      ring.setAttribute('class', 'timer-ring-fill' + (state ? ' ' + state : ''));
-    }
+  const ratio = totalTime > 0 ? remaining / totalTime : 1;
+  let state = '';
+  if (ratio < 0.25)      state = 'done';
+  else if (ratio < 0.50) state = 'warning';
+  dispEl.className = 'timer-display' + (state ? ' ' + state : '');
 
-    const statEl = status();
-    if (statEl) {
-      if (remaining <= 0) statEl.textContent = 'Terminé !';
-      else if (!isRunning) statEl.textContent = 'En pause';
-      else statEl.textContent = 'En cours';
-    }
+  const ring = ringFill();
+  if (ring) {
+    const offset = CIRCUMFERENCE * (1 - ratio);
+    ring.style.strokeDashoffset = offset;
+    ring.setAttribute('class', 'timer-ring-fill' + (state ? ' ' + state : ''));
   }
 
-  if (minimized) {
-    const mt = miniTime();
-    if (mt) mt.textContent = formatTime(remaining);
+  const statEl = status();
+  if (statEl) {
+    if (remaining <= 0) statEl.textContent = 'Terminé !';
+    else if (!isRunning) statEl.textContent = 'En pause';
+    else statEl.textContent = 'En cours';
   }
 }
 
@@ -71,7 +71,7 @@ function tick() {
     stop();
     updateDisplay();
     _notifyEnd();
-    _hideMini();
+    minimized = false;
     return;
   }
   updateDisplay();
@@ -111,31 +111,85 @@ function adjust(delta) {
 
 // ── Minimiser / restaurer ───────────────────────────────────────────────
 // Le repos n'a plus besoin de bloquer toute la page : on peut le réduire
-// en petite pastille flottante (cf. js/active-bar.js pour l'équivalent
-// séance en cours) et reprendre l'interaction avec la séance en dessous.
+// (poignée glissée vers le bas, ou simple tap) et reprendre l'interaction
+// avec la séance en dessous. L'état minimisé est lu par js/active-bar.js,
+// qui affiche alors le décompte dans la même barre flottante que la
+// séance en cours plutôt que d'avoir deux pastilles séparées.
 
 function minimize() {
   minimized = true;
   overlay()?.classList.add('hidden');
-  miniBar()?.classList.remove('hidden');
-  updateDisplay();
 }
 
 function restore() {
   minimized = false;
-  miniBar()?.classList.add('hidden');
   overlay()?.classList.remove('hidden');
   updateDisplay();
 }
 
-function _hideMini() {
-  minimized = false;
-  miniBar()?.classList.add('hidden');
+// ── Glisser la poignée vers le bas pour minimiser ───────────────────────
+
+function _bindDragToMinimize() {
+  const handle = document.getElementById('timer-minimize');
+  const sheet  = document.querySelector('#timer-overlay .timer-sheet');
+  if (!handle || !sheet) return;
+
+  const DISMISS_THRESHOLD = 60;
+  let startY = null, dy = 0;
+
+  const onMove = (e) => {
+    if (startY === null) return;
+    dy = Math.max(0, e.clientY - startY);
+    sheet.style.transition = 'none';
+    sheet.style.transform = `translateY(${dy}px)`;
+  };
+  const onUp = () => {
+    if (startY === null) return;
+    sheet.style.transition = '';
+    sheet.style.transform = '';
+    if (dy > DISMISS_THRESHOLD) minimize();
+    startY = null; dy = 0;
+  };
+
+  handle.addEventListener('pointerdown', (e) => { startY = e.clientY; dy = 0; });
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
+}
+
+// ── Son ──────────────────────────────────────────────────────────────────
+// Les navigateurs exigent qu'un AudioContext soit créé/débloqué pendant un
+// geste utilisateur — on le fait dès le premier tap dans l'app pour pouvoir
+// rejouer un son plus tard depuis le tick du minuteur (qui n'est pas un
+// geste utilisateur).
+
+function _unlockAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch {}
+}
+
+function _beep() {
+  if (!audioCtx) return;
+  try {
+    [[0, 880], [0.18, 1046], [0.36, 1318]].forEach(([delay, freq]) => {
+      const osc = audioCtx.createOscillator();
+      const g   = audioCtx.createGain();
+      osc.connect(g); g.connect(audioCtx.destination);
+      osc.frequency.value = freq;
+      g.gain.setValueAtTime(0.35, audioCtx.currentTime + delay);
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + 0.28);
+      osc.start(audioCtx.currentTime + delay);
+      osc.stop(audioCtx.currentTime + delay + 0.32);
+    });
+  } catch {}
 }
 
 // ── Notifications ──────────────────────────────────────────────────────
 
 function _notifyEnd() {
+  _beep();
   if ('Notification' in window && Notification.permission === 'granted') {
     new Notification('Esse — Repos terminé !', {
       body: 'C\'est l\'heure de votre prochaine série',
@@ -152,7 +206,6 @@ export function startRestTimer(seconds = APP_CONFIG.defaultRestTime) {
   totalTime = seconds;
   remaining = seconds;
   minimized = false;
-  miniBar()?.classList.add('hidden');
 
   // Initialiser l'anneau
   const ring = ringFill();
@@ -169,7 +222,6 @@ export function startRestTimer(seconds = APP_CONFIG.defaultRestTime) {
 export function hideTimer() {
   stop();
   minimized = false;
-  miniBar()?.classList.add('hidden');
   overlay()?.classList.add('hidden');
 }
 
@@ -185,6 +237,9 @@ export function initTimer() {
   if ('Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission();
   }
+
+  // Débloquer l'audio dès le premier tap dans l'app (cf. note plus haut)
+  document.addEventListener('pointerdown', _unlockAudio, { once: true });
 
   // Pause / Reprendre
   btnStart()?.addEventListener('click', () => {
@@ -202,12 +257,10 @@ export function initTimer() {
   // Passer le repos — arrêt complet, contrairement à minimiser
   document.getElementById('timer-skip')?.addEventListener('click', hideTimer);
 
-  // Minimiser : poignée du bottom sheet + appui sur le fond
+  // Minimiser : tap sur la poignée, glisser la poignée vers le bas, ou tap sur le fond
   document.getElementById('timer-minimize')?.addEventListener('click', minimize);
   document.getElementById('timer-backdrop')?.addEventListener('click', minimize);
-
-  // Restaurer depuis la pastille flottante
-  miniBar()?.addEventListener('click', restore);
+  _bindDragToMinimize();
 
   // Rattraper la dérive (et déclencher la notif si le temps est déjà
   // écoulé) dès que l'app redevient visible — utile quand les timers JS
