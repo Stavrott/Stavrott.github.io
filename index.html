@@ -147,15 +147,26 @@
         <section id="page-profil"     class="page hidden" data-page="profil"></section>
       </main>
 
-      <!-- Barre persistante : séance en cours -->
-      <button id="active-seance-bar" class="active-seance-bar hidden" aria-label="Reprendre la séance en cours">
-        <span class="asb-dot"></span>
-        <span class="asb-info">
-          <span class="asb-nom" id="asb-nom"></span>
-          <span class="asb-time" id="asb-time">00:00</span>
-        </span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="asb-arrow"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
+      <!-- Barres flottantes persistantes -->
+      <div class="floating-bars" id="floating-bars">
+        <button id="rest-timer-mini" class="floating-bar hidden" aria-label="Reprendre le minuteur de repos">
+          <span class="asb-dot"></span>
+          <span class="asb-info">
+            <span class="asb-nom">Repos</span>
+            <span class="asb-time" id="rtm-time">00:00</span>
+          </span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="asb-arrow"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+
+        <button id="active-seance-bar" class="floating-bar hidden" aria-label="Reprendre la séance en cours">
+          <span class="asb-dot"></span>
+          <span class="asb-info">
+            <span class="asb-nom" id="asb-nom"></span>
+            <span class="asb-time" id="asb-time">00:00</span>
+          </span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="asb-arrow"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
 
       <!-- Navigation inférieure -->
       <nav class="bottom-nav" id="bottom-nav" role="navigation" aria-label="Navigation principale">
@@ -247,7 +258,9 @@
     <div id="timer-overlay" class="timer-overlay hidden">
       <div class="timer-backdrop" id="timer-backdrop"></div>
       <div class="timer-sheet">
-        <div class="timer-handle"></div>
+        <button class="timer-handle-btn" id="timer-minimize" aria-label="Réduire le minuteur">
+          <span class="timer-handle"></span>
+        </button>
         <p class="timer-sheet-label">Temps de repos</p>
 
         <div class="timer-ring-wrap">

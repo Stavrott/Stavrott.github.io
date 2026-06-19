@@ -376,22 +376,27 @@ h1, h2, h3, h4, h5, h6 {
 .fab:active { transform: scale(0.92); }
 
 /* ══════════════════════════════════════════════════════════════════
-   BARRE PERSISTANTE — séance en cours (visible sur toutes les pages)
+   BARRES FLOTTANTES PERSISTANTES — séance en cours / repos minimisé
+   (visibles sur toutes les pages, empilées au-dessus de la nav)
    ══════════════════════════════════════════════════════════════════ */
-.active-seance-bar {
+.floating-bars {
   position: fixed;
   left: var(--space-3); right: var(--space-3);
   bottom: calc(var(--nav-height) + var(--safe-bottom) + var(--space-2));
+  display: flex; flex-direction: column; gap: var(--space-2);
+  z-index: 95;
+}
+.floating-bar {
   display: flex; align-items: center; gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   background: var(--color-primary-grad);
   color: white;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-accent);
-  z-index: 95;
+  width: 100%;
   transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
-.active-seance-bar:active { transform: scale(0.98); }
+.floating-bar:active { transform: scale(0.98); }
 
 .asb-dot {
   width: 8px; height: 8px; border-radius: 50%;
@@ -775,11 +780,18 @@ h1, h2, h3, h4, h5, h6 {
   animation: slideUp var(--transition-sheet);
 }
 
+.timer-handle-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; padding: var(--space-2) 0;
+  margin-bottom: var(--space-1);
+}
 .timer-handle {
   width: 36px; height: 4px;
   background: var(--surface-4); border-radius: 99px;
-  margin-bottom: var(--space-2);
+  transition: background var(--transition-fast);
 }
+.timer-handle-btn:hover .timer-handle,
+.timer-handle-btn:active .timer-handle { background: var(--color-primary); }
 
 .timer-sheet-label {
   font-size: var(--font-size-xs); font-weight: 700;
