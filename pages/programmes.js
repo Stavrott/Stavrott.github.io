@@ -8,7 +8,7 @@ import { openRoutineView }        from './routine-view.js';
 
 // ── Programmes prédéfinis ─────────────────────────────────────────────
 
-const PREDEFINED = [
+export const PREDEFINED = [
   {
     slug: 'ppl', nom: 'Push Pull Legs', badge: 'Intermédiaire', couleur: '#e8432a',
     description: '6 jours/semaine — alterne Pousser, Tirer et Jambes pour une hypertrophie maximale.',
@@ -395,7 +395,7 @@ function _openProgDetail(prog) {
     btn.addEventListener('click', async () => {
       const jourIndex = parseInt(btn.dataset.lancerJour);
       const jour = prog.jours[jourIndex];
-      await _lancerJour(prog, jour);
+      await lancerJour(prog, jour);
     });
   });
 }
@@ -443,7 +443,7 @@ function _jourAccordion(jour, i) {
 
 // ── Lancer une séance depuis un programme ─────────────────────────────
 
-async function _lancerJour(prog, jour) {
+export async function lancerJour(prog, jour) {
   closeModal();
   showLoading();
   try {
@@ -573,7 +573,7 @@ function _openJourPicker(prog) {
     showToast('Ce programme n\'a aucun jour configuré', 'warning');
     return;
   }
-  if (jours.length === 1) { _lancerJour(prog, jours[0]); return; }
+  if (jours.length === 1) { lancerJour(prog, jours[0]); return; }
 
   openModal({
     title: `Lancer — ${prog.nom}`,
@@ -594,7 +594,7 @@ function _openJourPicker(prog) {
   document.querySelectorAll('[data-jour-index]').forEach(btn => {
     btn.addEventListener('click', () => {
       const jour = jours[parseInt(btn.dataset.jourIndex)];
-      _lancerJour(prog, jour);
+      lancerJour(prog, jour);
     });
   });
 }
