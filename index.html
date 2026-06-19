@@ -147,6 +147,16 @@
         <section id="page-profil"     class="page hidden" data-page="profil"></section>
       </main>
 
+      <!-- Barre persistante : séance en cours -->
+      <button id="active-seance-bar" class="active-seance-bar hidden" aria-label="Reprendre la séance en cours">
+        <span class="asb-dot"></span>
+        <span class="asb-info">
+          <span class="asb-nom" id="asb-nom"></span>
+          <span class="asb-time" id="asb-time">00:00</span>
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="asb-arrow"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+
       <!-- Navigation inférieure -->
       <nav class="bottom-nav" id="bottom-nav" role="navigation" aria-label="Navigation principale">
         <button class="nav-item active" data-page="home" aria-label="Accueil">

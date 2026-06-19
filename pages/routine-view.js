@@ -3,7 +3,6 @@ import { currentUser }          from '../js/auth.js';
 import { EXERCICES }            from './exercices.js';
 import { showToast }            from '../js/utils.js';
 import { fetchExerciseImage }   from '../js/exercisedb.js';
-import { openSeance }           from './seance.js';
 import { metricFields, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
 
 // ── Mapping groupe → IDs SVG ───────────────────────────────────────────
@@ -327,7 +326,7 @@ export function openRoutineView(routine, { onEdit, onStart } = {}) {
 
   _el.querySelector('#rv-back')?.addEventListener('click', _close);
   _el.querySelector('#rv-edit')?.addEventListener('click', () => { _close(); onEdit?.(); });
-  _el.querySelector('#rv-start')?.addEventListener('click', () => { _close(); openSeance(routine); });
+  _el.querySelector('#rv-start')?.addEventListener('click', () => { _close(); onStart?.(); });
   _el.querySelector('#rv-chart-filters')?.addEventListener('click', e => {
     const btn = e.target.closest('.rv-filter');
     if (!btn) return;

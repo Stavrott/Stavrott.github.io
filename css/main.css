@@ -376,6 +376,45 @@ h1, h2, h3, h4, h5, h6 {
 .fab:active { transform: scale(0.92); }
 
 /* ══════════════════════════════════════════════════════════════════
+   BARRE PERSISTANTE — séance en cours (visible sur toutes les pages)
+   ══════════════════════════════════════════════════════════════════ */
+.active-seance-bar {
+  position: fixed;
+  left: var(--space-3); right: var(--space-3);
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + var(--space-2));
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-primary-grad);
+  color: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-accent);
+  z-index: 95;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+.active-seance-bar:active { transform: scale(0.98); }
+
+.asb-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: white; flex-shrink: 0;
+  animation: asbPulse 1.6s ease-in-out infinite;
+}
+@keyframes asbPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+.asb-info { flex: 1; min-width: 0; text-align: left; display: flex; flex-direction: column; gap: 1px; }
+.asb-nom {
+  font-size: var(--font-size-sm); font-weight: 800;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.asb-time {
+  font-size: var(--font-size-xs); font-weight: 600; opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+.asb-arrow { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.85; }
+
+/* ══════════════════════════════════════════════════════════════════
    NAVIGATION INFÉRIEURE
    — Calqué sur référence : couleur seule change, fine ligne accent
    ══════════════════════════════════════════════════════════════════ */

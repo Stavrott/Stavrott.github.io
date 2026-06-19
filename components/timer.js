@@ -41,7 +41,7 @@ function updateDisplay() {
   if (ring) {
     const offset = CIRCUMFERENCE * (1 - ratio);
     ring.style.strokeDashoffset = offset;
-    ring.className = 'timer-ring-fill' + (state ? ' ' + state : '');
+    ring.setAttribute('class', 'timer-ring-fill' + (state ? ' ' + state : ''));
   }
 
   // Statut texte

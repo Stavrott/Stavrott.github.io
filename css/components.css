@@ -363,6 +363,7 @@
 .sets-header-row .col-kg   { width: 72px; flex-shrink: 0; text-align: center; }
 .sets-header-row .col-reps { width: 60px; flex-shrink: 0; text-align: center; }
 .sets-header-row .col-done { width: 36px; flex-shrink: 0; }
+.sets-header-row .col-field { flex-shrink: 0; text-align: center; }
 
 .set-row {
   display: flex; align-items: center; gap: var(--space-2);

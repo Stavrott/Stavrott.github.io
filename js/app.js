@@ -14,6 +14,7 @@ import { loadProfil }      from '../pages/profil.js';
 import { initTimer }       from '../components/timer.js';
 import { initOnboarding, checkOnboardingDone, resetOnboardingDone } from '../pages/onboarding.js';
 import { openQuickLaunchModal } from './quick-launch.js';
+import { initActiveBar }        from './active-bar.js';
 
 // ── Thème ────────────────────────────────────────────────────────────
 
@@ -383,6 +384,7 @@ function _launchApp() {
   registerPages();
   initRouter();
   initQuickLaunchLongPress();
+  initActiveBar();
 }
 
 // ── Appui long sur l'onglet "Séances" → lancement rapide d'une routine ─
