@@ -13,6 +13,7 @@ import { loadExercices }   from '../pages/exercices.js';
 import { loadProfil }      from '../pages/profil.js';
 import { initTimer }       from '../components/timer.js';
 import { initOnboarding, checkOnboardingDone, resetOnboardingDone } from '../pages/onboarding.js';
+import { openQuickLaunchModal } from './quick-launch.js';
 
 // ── Thème ────────────────────────────────────────────────────────────
 
@@ -381,6 +382,42 @@ function _launchApp() {
   initUserDrawer();
   registerPages();
   initRouter();
+  initQuickLaunchLongPress();
+}
+
+// ── Appui long sur l'onglet "Séances" → lancement rapide d'une routine ─
+
+function initQuickLaunchLongPress() {
+  const btn = document.querySelector('.nav-item[data-page="seances"]');
+  if (!btn) return;
+
+  const LONG_PRESS_MS = 500;
+  let timer = null;
+  let triggered = false;
+
+  const start = () => {
+    triggered = false;
+    timer = setTimeout(() => {
+      triggered = true;
+      navigator.vibrate?.(10);
+      openQuickLaunchModal();
+    }, LONG_PRESS_MS);
+  };
+  const cancel = () => clearTimeout(timer);
+
+  btn.addEventListener('pointerdown', start);
+  btn.addEventListener('pointerup', cancel);
+  btn.addEventListener('pointerleave', cancel);
+  btn.addEventListener('pointercancel', cancel);
+
+  // Empêche la navigation normale si l'appui long a déjà déclenché la modale
+  btn.addEventListener('click', (e) => {
+    if (triggered) {
+      e.stopPropagation();
+      e.preventDefault();
+      triggered = false;
+    }
+  });
 }
 
 function _onLoggedIn(user) {

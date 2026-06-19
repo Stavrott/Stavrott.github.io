@@ -165,11 +165,11 @@ async function _renderRoutines() {
 function _openView(r) {
   openRoutineView(r, {
     onEdit:  () => openRoutineBuilder({ id: r.id, nom: r.nom, exercices: r.exercices }, state => _saveRoutine(state)),
-    onStart: () => _lancerRoutine(r),
+    onStart: () => lancerRoutine(r),
   });
 }
 
-async function _lancerRoutine(routine) {
+export async function lancerRoutine(routine) {
   showLoading();
   try {
     const nom     = routine.nom;

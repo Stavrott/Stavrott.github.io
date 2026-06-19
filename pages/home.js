@@ -2,6 +2,7 @@ import { currentUser, getUserPrenom } from '../js/auth.js';
 import { supabase }                   from '../js/supabase.js';
 import { navigate }                   from '../js/router.js';
 import { formatDate, getGreeting, todayStr, formatDuration, calc1RM, showToast } from '../js/utils.js';
+import { openQuickLaunchModal }       from '../js/quick-launch.js';
 
 // ── Données du tableau de bord ────────────────────────────────────────
 
@@ -221,7 +222,7 @@ export async function loadHome(section) {
     </div>`;
 
   // Événements
-  section.querySelector('#btn-start-seance')?.addEventListener('click', () => navigate('seances'));
+  section.querySelector('#btn-start-seance')?.addEventListener('click', () => openQuickLaunchModal());
 
   section.querySelectorAll('[data-nav]').forEach((btn) => {
     btn.addEventListener('click', () => navigate(btn.dataset.nav));

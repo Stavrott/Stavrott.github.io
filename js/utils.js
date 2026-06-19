@@ -148,3 +148,81 @@ export function lsSet(key, value) {
 }
 
 export function lsRemove(key) { localStorage.removeItem(key); }
+
+// ── Graphique SVG en courbe ─────────────────────────────────────────────
+
+export function svgLineChart(data, { color = 'var(--color-primary)', height = 140 } = {}) {
+  if (data.length < 2) {
+    if (data.length === 1) {
+      return `<div style="text-align:center;padding:var(--space-4);color:var(--text-muted);font-size:var(--font-size-sm)">
+        ${data[0].y} kg — une seule séance enregistrée
+      </div>`;
+    }
+    return '';
+  }
+
+  const W = 320, H = height, padX = 12, padY = 16;
+  const cW = W - padX * 2;
+  const cH = H - padY * 2;
+
+  const xs = data.map(d => d.x);
+  const ys = data.map(d => d.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys) * 0.95;
+  const maxY = Math.max(...ys) * 1.05;
+  const rangeX = maxX - minX || 1;
+  const rangeY = maxY - minY || 1;
+
+  const toSvg = (x, y) => ({
+    sx: padX + ((x - minX) / rangeX) * cW,
+    sy: padY + cH - ((y - minY) / rangeY) * cH,
+  });
+
+  const pts = data.map(d => toSvg(d.x, d.y));
+  const polyline = pts.map(p => `${p.sx},${p.sy}`).join(' ');
+
+  // Aire sous la courbe
+  const areaPath = `M ${pts[0].sx},${padY + cH} ` +
+    pts.map(p => `L ${p.sx},${p.sy}`).join(' ') +
+    ` L ${pts.at(-1).sx},${padY + cH} Z`;
+
+  // Cercles uniquement pour les points extrêmes + dernier
+  const circlePoints = [0, data.length - 1].filter((v, i, a) => a.indexOf(v) === i);
+
+  // Labels Y (min et max)
+  const yMin = Math.round(minY);
+  const yMax = Math.round(maxY);
+
+  return `
+    <div style="overflow:hidden;border-radius:var(--radius-md)">
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;overflow:visible">
+        <defs>
+          <linearGradient id="area-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${color}" stop-opacity="0.2"/>
+            <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Grille -->
+        <line x1="${padX}" y1="${padY}" x2="${padX}" y2="${padY+cH}" stroke="var(--border)" stroke-width="1"/>
+        <line x1="${padX}" y1="${padY+cH}" x2="${W-padX}" y2="${padY+cH}" stroke="var(--border)" stroke-width="1"/>
+
+        <!-- Aire -->
+        <path d="${areaPath}" fill="url(#area-grad)"/>
+
+        <!-- Ligne -->
+        <polyline points="${polyline}" fill="none" stroke="${color}" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- Points clés -->
+        ${circlePoints.map(i => {
+          const p = pts[i];
+          return `<circle cx="${p.sx}" cy="${p.sy}" r="4" fill="${color}" stroke="var(--surface)" stroke-width="2"/>`;
+        }).join('')}
+
+        <!-- Labels Y -->
+        <text x="${padX - 4}" y="${padY + 4}" fill="var(--text-muted)" font-size="9" text-anchor="end" font-weight="600">${yMax}</text>
+        <text x="${padX - 4}" y="${padY + cH}" fill="var(--text-muted)" font-size="9" text-anchor="end" font-weight="600">${yMin}</text>
+      </svg>
+    </div>`;
+}

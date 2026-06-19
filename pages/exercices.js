@@ -1,6 +1,7 @@
 import { currentUser }  from '../js/auth.js';
 import { supabase }      from '../js/supabase.js';
-import { debounce, openModal, closeModal, showToast, showLoading, hideLoading, emptyState } from '../js/utils.js';
+import { debounce, openModal, closeModal, showToast, showLoading, hideLoading, emptyState,
+         calc1RM, formatDate, todayStr, lsGet, lsSet, svgLineChart } from '../js/utils.js';
 import { fetchExerciseImage } from '../js/exercisedb.js';
 import { METRIC_TYPES, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
 
@@ -528,10 +529,96 @@ function _showDetail(exo) {
             color:var(--text-muted);margin-bottom:var(--space-2)">Description</p>
           <p style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:1.7">${exo.description}</p>
         </div>` : ''}
+
+        <!-- Progression -->
+        <div>
+          <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+            color:var(--text-muted);margin-bottom:var(--space-2)">Progression</p>
+          <div id="exo-progression">
+            <div class="skeleton skeleton-card" style="height:140px;margin-bottom:8px"></div>
+            <div class="skeleton skeleton-card" style="height:140px"></div>
+          </div>
+        </div>
       </div>`,
   });
 
   setTimeout(() => _loadGif(exo), 80);
+  setTimeout(() => _loadProgression(exo), 80);
+}
+
+function _progressionBaselineKey(exoNom) {
+  return `esse_prog_baseline_${currentUser.id}_${exoNom}`;
+}
+
+async function _loadProgression(exo) {
+  const wrap = document.getElementById('exo-progression');
+  if (!wrap) return;
+
+  try {
+    const { data: series, error } = await supabase
+      .from('series')
+      .select('poids_kg, repetitions, created_at')
+      .eq('user_id', currentUser.id)
+      .eq('exercice_nom', exo.nom)
+      .not('poids_kg', 'is', null)
+      .not('repetitions', 'is', null)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    if (!wrap.isConnected) return;
+
+    if (!series?.length) {
+      wrap.innerHTML = `<p style="color:var(--text-muted);font-size:var(--font-size-sm);text-align:center;padding:var(--space-4) 0">Aucune donnée enregistrée pour cet exercice.</p>`;
+      return;
+    }
+
+    // Regrouper par date → meilleur 1RM et poids max soulevé par date
+    const byDate = {};
+    for (const s of series) {
+      const date = s.created_at.split('T')[0];
+      const orm  = calc1RM(s.poids_kg, s.repetitions);
+      if (!byDate[date]) byDate[date] = { orm: 0, poids: 0 };
+      if (orm > byDate[date].orm)         byDate[date].orm   = orm;
+      if (s.poids_kg > byDate[date].poids) byDate[date].poids = s.poids_kg;
+    }
+    const points = Object.entries(byDate)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, v]) => ({ date, ...v }));
+
+    const baselineDate = lsGet(_progressionBaselineKey(exo.nom));
+    const basePoint = baselineDate
+      ? (points.find(p => p.date >= baselineDate) ?? points.at(-1))
+      : points[0];
+    const lastPoint   = points.at(-1);
+    const deltaPoids  = lastPoint.poids - basePoint.poids;
+
+    wrap.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+        <div class="card" style="padding:var(--space-4)">
+          <p class="card-title" style="margin-bottom:var(--space-3)">1RM estimé dans le temps</p>
+          ${svgLineChart(points.map(p => ({ x: new Date(p.date).getTime(), y: p.orm })))}
+        </div>
+        <div class="card" style="padding:var(--space-4)">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:var(--space-3)">
+            <p class="card-title">Poids soulevé dans le temps</p>
+            <button class="section-link" id="exo-prog-reset" style="font-size:11px">Réinitialiser</button>
+          </div>
+          ${svgLineChart(points.map(p => ({ x: new Date(p.date).getTime(), y: p.poids })), { color: 'var(--color-success)' })}
+          <p style="font-size:var(--font-size-sm);margin-top:var(--space-3);font-weight:700;
+            color:${deltaPoids >= 0 ? 'var(--color-success)' : 'var(--color-error)'}">
+            ${deltaPoids >= 0 ? '+' : ''}${deltaPoids} kg depuis ${formatDate(basePoint.date)}
+          </p>
+        </div>
+      </div>`;
+
+    wrap.querySelector('#exo-prog-reset')?.addEventListener('click', () => {
+      lsSet(_progressionBaselineKey(exo.nom), todayStr());
+      _loadProgression(exo);
+    });
+  } catch {
+    if (wrap.isConnected) {
+      wrap.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:var(--space-4)">Erreur de chargement</p>`;
+    }
+  }
 }
 
 async function _loadGif(exo) {
