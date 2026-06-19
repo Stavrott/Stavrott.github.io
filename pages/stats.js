@@ -229,7 +229,7 @@ async function _renderProgression(section) {
 
       const { data: series } = await supabase
         .from('series')
-        .select('poids_kg, repetitions, created_at')
+        .select('poids_kg, repetitions, created_at, seance_id')
         .eq('user_id', currentUser.id)
         .eq('exercice_nom', exoNom)
         .not('poids_kg', 'is', null)
@@ -241,19 +241,22 @@ async function _renderProgression(section) {
         return;
       }
 
-      // Grouper par date → meilleur 1RM par date
-      const byDate = {};
+      // Grouper par séance (et non par jour calendaire) → meilleur 1RM par
+      // séance, sinon deux séances le même jour s'écrasent en un seul point.
+      const bySeance = {};
       for (const s of series) {
-        const date = s.created_at.split('T')[0];
-        const orm  = calc1RM(s.poids_kg, s.repetitions);
-        if (!byDate[date] || orm > byDate[date].orm) {
-          byDate[date] = { orm, poids: s.poids_kg, reps: s.repetitions };
+        const key = s.seance_id;
+        const orm = calc1RM(s.poids_kg, s.repetitions);
+        if (!bySeance[key]) bySeance[key] = { date: s.created_at, orm: 0, poids: null, reps: null };
+        if (s.created_at < bySeance[key].date) bySeance[key].date = s.created_at;
+        if (orm > bySeance[key].orm) {
+          bySeance[key].orm   = orm;
+          bySeance[key].poids = s.poids_kg;
+          bySeance[key].reps  = s.repetitions;
         }
       }
 
-      const points = Object.entries(byDate)
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([date, v]) => ({ date, ...v }));
+      const points = Object.values(bySeance).sort((a, b) => a.date.localeCompare(b.date));
 
       const bestOrm  = Math.max(...points.map(p => p.orm));
       const firstOrm = points[0].orm;

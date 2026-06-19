@@ -557,7 +557,7 @@ async function _loadProgression(exo) {
   try {
     const { data: series, error } = await supabase
       .from('series')
-      .select('poids_kg, repetitions, created_at')
+      .select('poids_kg, repetitions, created_at, seance_id')
       .eq('user_id', currentUser.id)
       .eq('exercice_nom', exo.nom)
       .not('poids_kg', 'is', null)
@@ -571,18 +571,19 @@ async function _loadProgression(exo) {
       return;
     }
 
-    // Regrouper par date → meilleur 1RM et poids max soulevé par date
-    const byDate = {};
+    // Regrouper par séance (et non par jour calendaire) → meilleur 1RM et
+    // poids max par séance, sinon deux séances le même jour s'écrasent en
+    // un seul point et la progression entre les deux disparaît.
+    const bySeance = {};
     for (const s of series) {
-      const date = s.created_at.split('T')[0];
-      const orm  = calc1RM(s.poids_kg, s.repetitions);
-      if (!byDate[date]) byDate[date] = { orm: 0, poids: 0 };
-      if (orm > byDate[date].orm)         byDate[date].orm   = orm;
-      if (s.poids_kg > byDate[date].poids) byDate[date].poids = s.poids_kg;
+      const key = s.seance_id;
+      const orm = calc1RM(s.poids_kg, s.repetitions);
+      if (!bySeance[key]) bySeance[key] = { date: s.created_at, orm: 0, poids: 0 };
+      if (s.created_at < bySeance[key].date) bySeance[key].date = s.created_at;
+      if (orm > bySeance[key].orm)         bySeance[key].orm   = orm;
+      if (s.poids_kg > bySeance[key].poids) bySeance[key].poids = s.poids_kg;
     }
-    const points = Object.entries(byDate)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, v]) => ({ date, ...v }));
+    const points = Object.values(bySeance).sort((a, b) => a.date.localeCompare(b.date));
 
     const baselineDate = lsGet(_progressionBaselineKey(exo.nom));
     const basePoint = baselineDate
