@@ -1,13 +1,13 @@
 {
-  "name": "Esse - Suivi Musculation",
-  "short_name": "Esse",
+  "name": "Forme - Suivi Musculation",
+  "short_name": "Forme",
   "description": "Application PWA de suivi de musculation, programmes et nutrition",
   "start_url": "/esse-app/",
   "scope": "/esse-app/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#0f0f0f",
-  "theme_color": "#e8432a",
+  "background_color": "#0E0C0A",
+  "theme_color": "#C9A35C",
   "lang": "fr",
   "categories": ["health", "fitness", "sports"],
   "icons": [

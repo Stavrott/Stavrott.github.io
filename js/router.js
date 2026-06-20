@@ -38,7 +38,7 @@ export async function navigate(pageId, params = {}) {
 
   // Mettre à jour le titre du header
   const titleEl = document.getElementById('page-title');
-  if (titleEl) titleEl.textContent = _titleMap[pageId] || 'Esse';
+  if (titleEl) titleEl.textContent = _titleMap[pageId] || 'Forme';
 
   // Bouton retour (affiché uniquement si on n'est pas sur home)
   const backBtn = document.getElementById('back-btn');

@@ -76,7 +76,7 @@ h1, h2, h3, h4, h5, h6 {
   position: relative;
 }
 
-/* Halo braise diffus — fond de scène */
+/* Halo or diffus — fond de scène, très sobre */
 .auth-screen::before {
   content: '';
   position: fixed;
@@ -87,8 +87,8 @@ h1, h2, h3, h4, h5, h6 {
   height: 420px;
   background: radial-gradient(
     ellipse at center bottom,
-    rgba(232, 48, 0, 0.18) 0%,
-    rgba(180, 24, 0, 0.08) 40%,
+    rgba(201, 163, 92, 0.10) 0%,
+    rgba(201, 163, 92, 0.04) 40%,
     transparent 70%
   );
   pointer-events: none;
@@ -106,34 +106,11 @@ h1, h2, h3, h4, h5, h6 {
   height: 320px;
   background: radial-gradient(
     ellipse at center,
-    rgba(232, 48, 0, 0.09) 0%,
+    rgba(201, 163, 92, 0.05) 0%,
     transparent 65%
   );
   pointer-events: none;
   z-index: 0;
-}
-
-/* ── Particules de braise flottantes ──────────────────────────────── */
-.ember {
-  position: fixed;
-  border-radius: 50%;
-  background: radial-gradient(circle at 38% 32%,
-    #FFB040 0%, #FF5000 50%, #CC1800 100%);
-  box-shadow:
-    0 0 3px 1px rgba(255, 90, 0, 0.75),
-    0 0 8px 2px rgba(210, 40, 0, 0.35);
-  pointer-events: none;
-  animation: floatEmber var(--dur, 5s) var(--delay, 0s) infinite ease-in;
-  opacity: 0;
-  z-index: 0;
-  will-change: transform, opacity;
-}
-
-@keyframes floatEmber {
-  0%   { opacity: 0;                    transform: translateY(0)      translateX(0)                  scale(1);    }
-  7%   { opacity: var(--bright, 0.90);  }
-  85%  { opacity: calc(var(--bright, 0.90) * 0.4); }
-  100% { opacity: 0;                    transform: translateY(-78vh)  translateX(var(--drift, 0px))  scale(0.12); }
 }
 
 .auth-container {
@@ -154,42 +131,28 @@ h1, h2, h3, h4, h5, h6 {
   gap: 0;
 }
 
-.auth-logo-icon { width: 200px; height: 200px; }
+.auth-logo-icon { width: 140px; height: 140px; }
 
-/* Logo PNG fond transparent — halo feu */
+/* Logo PNG fond transparent — léger halo or, sobre */
 .auth-app-icon {
-  width: 200px;
-  height: 200px;
+  width: 140px;
+  height: 140px;
   object-fit: contain;
-  filter:
-    drop-shadow(0 0 14px rgba(255, 100, 0, 0.85))
-    drop-shadow(0 0 36px rgba(220, 50, 0, 0.50))
-    drop-shadow(0 0 70px rgba(180, 20, 0, 0.28));
+  filter: drop-shadow(0 0 18px rgba(201, 163, 92, 0.35));
 }
 
 .auth-logo h1 {
-  font-size: 2.8rem;
-  font-weight: 900;
-  letter-spacing: 0.22em;
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
-  background: linear-gradient(180deg,
-    #C8C8D2 0%,
-    #8A8A96 18%,
-    #3E3E48 40%,
-    #5A5A66 58%,
-    #9A9AA6 78%,
-    #4A4A54 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
   line-height: 1;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.80));
-  margin-top: -20px;
+  margin-top: 4px;
 }
 
 .auth-card {
-  background: rgba(18, 18, 18, 0.92);
+  background: rgba(24, 22, 20, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-2xl);
   padding: var(--space-5) var(--space-6) var(--space-6);

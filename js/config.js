@@ -9,7 +9,7 @@ export const SW_CACHE_VERSION = 'v1';
 
 // Paramètres de l'application
 export const APP_CONFIG = {
-  name:       'Esse',
+  name:       'Forme',
   version:    '1.0.0',
   // Durée de repos par défaut entre les séries (secondes)
   defaultRestTime: 90,

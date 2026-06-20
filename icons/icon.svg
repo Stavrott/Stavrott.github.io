@@ -1,11 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="114" fill="url(#grad)"/>
-  <path d="M128 256h42.7m170.6 0H384M170.7 256V202.7A21.3 21.3 0 01192 181.3h42.7A21.3 21.3 0 01256 202.7v106.6A21.3 21.3 0 01234.7 330.7H192A21.3 21.3 0 01170.7 309.3V256zm85.3 0V202.7A21.3 21.3 0 01277.3 181.3H320A21.3 21.3 0 01341.3 202.7v106.6A21.3 21.3 0 01320 330.7H277.3A21.3 21.3 0 01256 309.3V256z"
-    stroke="white" stroke-width="26.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <defs>
-    <linearGradient id="grad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#e8432a"/>
-      <stop offset="1" stop-color="#f06442"/>
-    </linearGradient>
-  </defs>
+  <rect width="512" height="512" fill="#161514"/>
+  <g transform="translate(256,256) scale(5.5)" fill="none" stroke="#C9A35C" stroke-width="2.3" stroke-linecap="round">
+    <circle r="28"/>
+    <circle r="23" opacity="0.4"/>
+    <circle r="9"/>
+    <ellipse cx="-19" cy="0" rx="6" ry="4" fill="#C9A35C" stroke="none"/>
+    <ellipse cx="19" cy="0" rx="6" ry="4" fill="#C9A35C" stroke="none"/>
+  </g>
 </svg>

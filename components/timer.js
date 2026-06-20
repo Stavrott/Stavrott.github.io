@@ -221,7 +221,7 @@ const REST_LABEL = [
 
 function _notifyStart(seconds) {
   _lastNotifyUpdate = Date.now();
-  _showNotification('Esse — Repos en cours', `${formatTime(seconds)} restant`, REST_LABEL);
+  _showNotification('Forme — Repos en cours', `${formatTime(seconds)} restant`, REST_LABEL);
 }
 
 // Remet à jour le texte de la même notification (même tag) toutes les
@@ -238,12 +238,12 @@ function _maybeRefreshNotification() {
   const now = Date.now();
   if (now - _lastNotifyUpdate < NOTIF_REFRESH_MS) return;
   _lastNotifyUpdate = now;
-  _showNotification('Esse — Repos en cours', `${formatTime(remaining)} restant`, REST_LABEL, { silent: true, renotify: false });
+  _showNotification('Forme — Repos en cours', `${formatTime(remaining)} restant`, REST_LABEL, { silent: true, renotify: false });
 }
 
 function _notifyEnd() {
   _beep();
-  _showNotification('Esse — Repos terminé !', 'C\'est l\'heure de votre prochaine série', []);
+  _showNotification('Forme — Repos terminé !', 'C\'est l\'heure de votre prochaine série', []);
   if ('vibrate' in navigator) navigator.vibrate([150, 80, 150]);
 }
 
