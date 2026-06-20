@@ -49,7 +49,14 @@ export async function signUp(email, password, prenom) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { prenom } },
+      options: {
+        data: { prenom },
+        // Sans ça, le lien de confirmation par email suit l'"Site URL" du
+        // projet Supabase (encore sur localhost:3000 par défaut) plutôt que
+        // le domaine réel — on le fixe explicitement ici, peu importe ce
+        // réglage côté dashboard.
+        emailRedirectTo: window.location.origin + window.location.pathname,
+      },
     });
     if (error) throw error;
 
