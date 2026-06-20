@@ -148,6 +148,15 @@
 .badge-warning { background: var(--color-warning-light); color: var(--color-warning); }
 .badge-muted   { background: var(--surface-2);           color: var(--text-muted); }
 
+.muscle-tag {
+  display: inline-flex; align-items: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 10px; font-weight: 700;
+}
+
 .chip {
   display: inline-flex; align-items: center;
   padding: var(--space-2) var(--space-3);

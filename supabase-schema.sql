@@ -152,3 +152,7 @@ alter table series           add column if not exists vitesse_kmh     numeric(5,
 alter table series           add column if not exists inclinaison_pct numeric(4,1);
 alter table series           add column if not exists resistance      numeric(5,1);
 alter table exercices_custom add column if not exists type_metrique   text default 'kg_reps';
+
+-- ── Calories estimées + muscles travaillés par séance (voir js/calories.js) ────
+alter table seances add column if not exists calories_estimees integer;
+alter table seances add column if not exists muscles_travailles text[];

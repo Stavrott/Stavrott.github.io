@@ -4,6 +4,9 @@ import { showToast, formatTime, openModal, closeModal, confirmDialog } from '../
 import { startRestTimer }             from '../components/timer.js';
 import { APP_CONFIG }                 from '../js/config.js';
 import { metricFields, parseFieldValue, fieldByKey, FIELD_DB_COLUMN, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
+import { estimateCaloriesSeance, musclesTravailles } from '../js/calories.js';
+import { getPoidsActuel } from './profil.js';
+import { navigate } from '../js/router.js';
 
 // ── État global ───────────────────────────────────────────────────────
 
@@ -291,23 +294,24 @@ function _blankSet(fields, perf) {
   return set;
 }
 
-async function _lookupTypeMetrique(nom) {
+async function _lookupExerciceMeta(nom) {
   try {
     const { getAllExercices } = await import('./exercices.js');
     const EXERCICES = await getAllExercices();
-    return EXERCICES.find(e => e.nom === nom)?.type_metrique || DEFAULT_METRIC_TYPE;
+    const exo = EXERCICES.find(e => e.nom === nom);
+    return { type_metrique: exo?.type_metrique || DEFAULT_METRIC_TYPE, muscles: exo?.muscles ?? [] };
   } catch {
-    return DEFAULT_METRIC_TYPE;
+    return { type_metrique: DEFAULT_METRIC_TYPE, muscles: [] };
   }
 }
 
 export async function addExercice(nom) {
-  const type_metrique = await _lookupTypeMetrique(nom);
+  const { type_metrique, muscles } = await _lookupExerciceMeta(nom);
   const fields = metricFields(type_metrique);
   const perf   = await _fetchLastPerf(nom, type_metrique);
 
   _state.exercices.push({
-    nom, type_metrique, repos_inter: APP_CONFIG.defaultRestTime,
+    nom, type_metrique, muscles, repos_inter: APP_CONFIG.defaultRestTime,
     lastPerf: perf?.summary ?? null,
     sets: [_blankSet(fields, perf)],
   });
@@ -321,13 +325,14 @@ export async function addExercice(nom) {
 
 export async function addExercices(noms) {
   if (!noms?.length) return;
-  const types = await Promise.all(noms.map(_lookupTypeMetrique));
-  const perfs = await Promise.all(noms.map((n, i) => _fetchLastPerf(n, types[i])));
+  const metas = await Promise.all(noms.map(_lookupExerciceMeta));
+  const perfs = await Promise.all(noms.map((n, i) => _fetchLastPerf(n, metas[i].type_metrique)));
 
   noms.forEach((nom, i) => {
-    const fields = metricFields(types[i]);
+    const { type_metrique, muscles } = metas[i];
+    const fields = metricFields(type_metrique);
     _state.exercices.push({
-      nom, type_metrique: types[i], repos_inter: APP_CONFIG.defaultRestTime,
+      nom, type_metrique, muscles, repos_inter: APP_CONFIG.defaultRestTime,
       lastPerf: perfs[i]?.summary ?? null,
       sets: [_blankSet(fields, perfs[i])],
     });
@@ -345,7 +350,10 @@ export async function addExercicesFromRoutine(routine) {
   const exercices = routine?.exercices ?? [];
   if (!exercices.length) return;
 
-  const perfs = await Promise.all(exercices.map(ex => _fetchLastPerf(ex.nom, ex.type_metrique)));
+  const [perfs, metas] = await Promise.all([
+    Promise.all(exercices.map(ex => _fetchLastPerf(ex.nom, ex.type_metrique))),
+    Promise.all(exercices.map(ex => _lookupExerciceMeta(ex.nom))),
+  ]);
 
   exercices.forEach((ex, i) => {
     const type_metrique = ex.type_metrique || DEFAULT_METRIC_TYPE;
@@ -361,7 +369,7 @@ export async function addExercicesFromRoutine(routine) {
       : [_blankSet(fields, perfs[i])];
 
     _state.exercices.push({
-      nom: ex.nom, type_metrique, repos_inter: ex.repos_inter,
+      nom: ex.nom, type_metrique, muscles: metas[i].muscles, repos_inter: ex.repos_inter,
       lastPerf: perfs[i]?.summary ?? null,
       sets,
     });
@@ -610,20 +618,41 @@ async function _confirmFinish() {
     return;
   }
 
+  const poidsKg  = await getPoidsActuel();
+  const calories = estimateCaloriesSeance(_state.exercices, duree, poidsKg);
+  const muscles  = musclesTravailles(_state.exercices);
+
   openModal({
     title: 'Terminer la séance ?',
     body: `
       <div class="seance-finish-summary">
-        <div class="grid-2">
+        <div class="grid-3">
           <div class="card" style="text-align:center">
             <p class="card-label">Durée</p>
             <p class="card-value" style="font-size:var(--font-size-2xl)">${duree}<span class="card-unit"> min</span></p>
           </div>
           <div class="card" style="text-align:center">
-            <p class="card-label">Séries validées</p>
+            <p class="card-label">Séries</p>
             <p class="card-value" style="font-size:var(--font-size-2xl)">${totalSets}</p>
           </div>
+          <div class="card" style="text-align:center">
+            <p class="card-label">Calories</p>
+            ${calories != null
+              ? `<p class="card-value" style="font-size:var(--font-size-2xl)">${calories}<span class="card-unit"> kcal</span></p>`
+              : `<p class="card-value" style="font-size:var(--font-size-sm);color:var(--text-muted)">—</p>`}
+          </div>
         </div>
+        ${calories == null ? `
+          <p style="font-size:var(--font-size-xs);color:var(--text-muted);margin-top:var(--space-2);text-align:center">
+            Renseignez votre poids dans votre <a href="#" id="link-profil-poids" style="color:var(--color-primary);font-weight:700">profil</a> pour estimer les calories.
+          </p>` : ''}
+        ${muscles.length ? `
+          <div style="margin-top:var(--space-4)">
+            <p class="form-label" style="margin-bottom:var(--space-2)">Muscles travaillés</p>
+            <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+              ${muscles.map(m => `<span class="muscle-tag">${_esc(m)}</span>`).join('')}
+            </div>
+          </div>` : ''}
         <div class="form-group" style="margin-top:var(--space-4)">
           <label class="form-label">Notes de séance (facultatif)</label>
           <textarea class="form-input form-textarea" id="seance-notes-final" rows="3"
@@ -636,14 +665,21 @@ async function _confirmFinish() {
   });
 
   document.getElementById('btn-continue-seance')?.addEventListener('click', closeModal);
-  document.getElementById('btn-confirm-finish')?.addEventListener('click', () => _doFinish(duree));
+  document.getElementById('btn-confirm-finish')?.addEventListener('click', () => _doFinish(duree, calories, muscles));
+  document.getElementById('link-profil-poids')?.addEventListener('click', e => {
+    e.preventDefault(); closeModal(); navigate('profil');
+  });
 }
 
-async function _doFinish(duree) {
+async function _doFinish(duree, calories, muscles) {
   closeModal();
   const notes = document.getElementById('seance-notes-final')?.value.trim() || null;
   try {
-    await supabase.from('seances').update({ duree_minutes: duree, notes }).eq('id', _state.seance.id);
+    await supabase.from('seances').update({
+      duree_minutes: duree, notes,
+      calories_estimees: calories,
+      muscles_travailles: muscles.length ? muscles : null,
+    }).eq('id', _state.seance.id);
     await _syncRoutineProgress();
     showToast(`Séance terminée — ${duree} min`, 'success', 4000);
   } catch {

@@ -1,6 +1,6 @@
 import { currentUser }  from '../js/auth.js';
 import { supabase }     from '../js/supabase.js';
-import { calc1RM, formatDate, svgLineChart } from '../js/utils.js';
+import { calc1RM, formatDate, svgLineChart, escapeHtml } from '../js/utils.js';
 
 // ── Point d'entrée ────────────────────────────────────────────────────
 
@@ -39,30 +39,43 @@ async function _renderResumes(section) {
     const monthAgo = new Date(now - 30 * 86400000).toISOString().split('T')[0];
 
     const [{ data: week }, { data: month }, { data: allSeances }] = await Promise.all([
-      supabase.from('seances').select('id, duree_minutes, date').eq('user_id', currentUser.id).gte('date', weekAgo),
+      supabase.from('seances').select('id, duree_minutes, date, calories_estimees, muscles_travailles').eq('user_id', currentUser.id).gte('date', weekAgo),
       supabase.from('seances').select('id, duree_minutes').eq('user_id', currentUser.id).gte('date', monthAgo),
       supabase.from('seances').select('id').eq('user_id', currentUser.id),
     ]);
 
-    const weekCount  = week?.length  ?? 0;
-    const monthCount = month?.length ?? 0;
-    const totalCount = allSeances?.length ?? 0;
-    const weekMin    = week?.reduce((s, x)  => s + (x.duree_minutes ?? 0), 0) ?? 0;
-    const monthMin   = month?.reduce((s, x) => s + (x.duree_minutes ?? 0), 0) ?? 0;
+    const weekCount   = week?.length  ?? 0;
+    const monthCount  = month?.length ?? 0;
+    const totalCount  = allSeances?.length ?? 0;
+    const weekMin     = week?.reduce((s, x)  => s + (x.duree_minutes ?? 0), 0) ?? 0;
+    const monthMin    = month?.reduce((s, x) => s + (x.duree_minutes ?? 0), 0) ?? 0;
+    const weekCalories = week?.reduce((s, x) => s + (x.calories_estimees ?? 0), 0) ?? 0;
+    const weekMuscles  = _muscleCounts(week ?? []);
 
     content.innerHTML = `
       <div class="page-section">
         <h3 class="section-title" style="margin-bottom:var(--space-3)">Cette semaine</h3>
-        <div class="grid-2">
+        <div class="grid-3">
           <div class="card">
             <p class="card-title">Séances</p>
             <p class="card-value">${weekCount}</p>
           </div>
           <div class="card">
-            <p class="card-title">Temps d'entraîn.</p>
+            <p class="card-title">Temps</p>
             <p class="card-value">${weekMin >= 60 ? Math.floor(weekMin/60) + 'h' + String(weekMin%60).padStart(2,'0') : weekMin}<span>${weekMin >= 60 ? '' : ' min'}</span></p>
           </div>
+          <div class="card">
+            <p class="card-title">Calories</p>
+            <p class="card-value">${weekCalories}<span> kcal</span></p>
+          </div>
         </div>
+        ${weekMuscles.length ? `
+        <div class="card" style="margin-top:var(--space-3)">
+          <p class="card-title" style="margin-bottom:var(--space-2)">Muscles travaillés</p>
+          <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+            ${weekMuscles.map(([m, c]) => `<span class="muscle-tag">${escapeHtml(m)}${c > 1 ? ` ×${c}` : ''}</span>`).join('')}
+          </div>
+        </div>` : ''}
       </div>
 
       <div class="page-section">
@@ -96,6 +109,16 @@ async function _renderResumes(section) {
   } catch {
     content.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:var(--space-6)">Erreur de chargement</p>`;
   }
+}
+
+function _muscleCounts(seances) {
+  const counts = new Map();
+  for (const s of seances) {
+    for (const m of s.muscles_travailles ?? []) {
+      counts.set(m, (counts.get(m) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
 }
 
 function _frequencyBars(seances) {

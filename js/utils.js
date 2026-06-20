@@ -1,3 +1,9 @@
+// ── Échappement HTML ─────────────────────────────────────────────────
+
+export function escapeHtml(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
 // ── Toast ────────────────────────────────────────────────────────────
 
 const toastIcons = {

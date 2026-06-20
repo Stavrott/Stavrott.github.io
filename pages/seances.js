@@ -1,6 +1,6 @@
 import { currentUser }       from '../js/auth.js';
 import { supabase }           from '../js/supabase.js';
-import { showToast, formatDate, formatDuration, openModal, closeModal, emptyState, showLoading, hideLoading, confirmDialog } from '../js/utils.js';
+import { showToast, formatDate, formatDuration, openModal, closeModal, emptyState, showLoading, hideLoading, confirmDialog, escapeHtml } from '../js/utils.js';
 import { hasActiveSeance, startSeance, resumeActiveView } from './seance-active.js';
 
 // ── Chargement de la page ─────────────────────────────────────────────
@@ -429,12 +429,19 @@ async function _openSeanceDetail(seanceId, seanceNom, section) {
   });
 
   try {
-    const { data: series } = await supabase
-      .from('series')
-      .select('exercice_nom, numero_serie, poids_kg, repetitions, temps_repos_s, notes')
-      .eq('seance_id', seanceId)
-      .order('exercice_nom')
-      .order('numero_serie');
+    const [{ data: series }, { data: seance }] = await Promise.all([
+      supabase
+        .from('series')
+        .select('exercice_nom, numero_serie, poids_kg, repetitions, temps_repos_s, notes')
+        .eq('seance_id', seanceId)
+        .order('exercice_nom')
+        .order('numero_serie'),
+      supabase
+        .from('seances')
+        .select('calories_estimees, muscles_travailles')
+        .eq('id', seanceId)
+        .maybeSingle(),
+    ]);
 
     if (!series?.length) {
       document.getElementById('modal-body').innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:var(--space-6)">Aucune série enregistrée.</p>`;
@@ -448,6 +455,8 @@ async function _openSeanceDetail(seanceId, seanceNom, section) {
     }, {});
 
     const totalVol = series.reduce((n, s) => n + (s.poids_kg ?? 0) * (s.repetitions ?? 0), 0);
+    const calories = seance?.calories_estimees ?? null;
+    const muscles  = seance?.muscles_travailles ?? [];
 
     document.getElementById('modal-body').innerHTML = `
       <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-5)">
@@ -463,7 +472,19 @@ async function _openSeanceDetail(seanceId, seanceNom, section) {
           <p class="card-title">Volume</p>
           <p class="card-value" style="font-size:var(--font-size-xl)">${Math.round(totalVol)}<span> kg</span></p>
         </div>
+        ${calories != null ? `
+        <div class="card" style="flex:1;text-align:center;padding:var(--space-3)">
+          <p class="card-title">Calories</p>
+          <p class="card-value" style="font-size:var(--font-size-xl)">${calories}<span> kcal</span></p>
+        </div>` : ''}
       </div>
+      ${muscles.length ? `
+      <div style="margin-bottom:var(--space-5)">
+        <p style="font-weight:800;font-size:var(--font-size-sm);margin-bottom:var(--space-2)">Muscles travaillés</p>
+        <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+          ${muscles.map(m => `<span class="muscle-tag">${escapeHtml(m)}</span>`).join('')}
+        </div>
+      </div>` : ''}
       ${Object.entries(byExo).map(([nom, sets]) => `
         <div style="margin-bottom:var(--space-5)">
           <p style="font-weight:800;font-size:var(--font-size-sm);margin-bottom:var(--space-2)">${nom}</p>

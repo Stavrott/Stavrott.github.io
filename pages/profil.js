@@ -53,6 +53,17 @@ function labelOf(list, value) {
 
 // ── Export pour le drawer ──────────────────────────────────────────────
 
+export async function getPoidsActuel() {
+  try {
+    const [{ data: hist }, { data: profil }] = await Promise.all([
+      supabase.from('historique_poids').select('poids_kg').eq('user_id', currentUser.id)
+        .order('date', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('profils').select('poids_kg').eq('user_id', currentUser.id).maybeSingle(),
+    ]);
+    return hist?.poids_kg ?? profil?.poids_kg ?? null;
+  } catch { return null; }
+}
+
 export async function getProfilSummary() {
   try {
     const { data } = await supabase
