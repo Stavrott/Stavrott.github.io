@@ -80,6 +80,7 @@ function tick() {
     return;
   }
   updateDisplay();
+  _maybeRefreshNotification();
 }
 
 function start() {
@@ -112,6 +113,7 @@ function adjust(delta) {
   if (totalTime < remaining) totalTime = remaining;
   if (isRunning) endTime = Date.now() + remaining * 1000;
   updateDisplay();
+  if (isRunning) { _lastNotifyUpdate = 0; _maybeRefreshNotification(); }
 }
 
 // ── Minimiser / restaurer ───────────────────────────────────────────────
@@ -197,7 +199,7 @@ function _beep() {
 // montre connectée : les notifs du téléphone s'y reflètent automatiquement
 // via l'OS, boutons inclus, sans rien construire de natif.
 
-function _showNotification(title, body, actions) {
+function _showNotification(title, body, actions, { silent = false, renotify = true } = {}) {
   if (!('Notification' in window) || Notification.permission !== 'granted' || !('serviceWorker' in navigator)) return;
   navigator.serviceWorker.ready.then(reg => {
     reg.showNotification(title, {
@@ -205,17 +207,38 @@ function _showNotification(title, body, actions) {
       icon: '/esse-app/icons/icon-192.png',
       badge: '/esse-app/icons/icon-192.png',
       tag: 'timer-rest',
-      renotify: true,
+      renotify,
+      silent,
       actions,
     });
   }).catch(() => {});
 }
 
+const REST_LABEL = [
+  { action: 'plus15', title: '+15 s' },
+  { action: 'skip',   title: 'Passer' },
+];
+
 function _notifyStart(seconds) {
-  _showNotification('Esse — Repos en cours', `${formatTime(seconds)} avant la prochaine série`, [
-    { action: 'plus15', title: '+15 s' },
-    { action: 'skip',   title: 'Passer' },
-  ]);
+  _lastNotifyUpdate = Date.now();
+  _showNotification('Esse — Repos en cours', `${formatTime(seconds)} restant`, REST_LABEL);
+}
+
+// Remet à jour le texte de la même notification (même tag) toutes les
+// quelques secondes pendant le repos, en silencieux — l'utilisateur voit
+// le décompte sans qu'elle ne re-sonne/vibre à chaque rafraîchissement.
+// Ce n'est pas une notif "permanente" au sens natif (l'utilisateur peut
+// toujours la balayer, et tout s'arrête si l'app est totalement fermée
+// depuis le multitâche) — mais ça suffit à suivre le repos sans rouvrir
+// l'app, et ça se reflète sur une montre connectée comme les autres.
+const NOTIF_REFRESH_MS = 5000;
+let _lastNotifyUpdate = 0;
+
+function _maybeRefreshNotification() {
+  const now = Date.now();
+  if (now - _lastNotifyUpdate < NOTIF_REFRESH_MS) return;
+  _lastNotifyUpdate = now;
+  _showNotification('Esse — Repos en cours', `${formatTime(remaining)} restant`, REST_LABEL, { silent: true, renotify: false });
 }
 
 function _notifyEnd() {
