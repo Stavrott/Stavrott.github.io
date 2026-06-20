@@ -432,7 +432,14 @@ async function boot() {
   await initAuth(_onLoggedIn, showAuth);
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/service-worker.js')
+    // updateViaCache: 'none' — GitHub Pages ne permet pas de configurer les
+    // en-têtes de cache HTTP ; sans ça, le navigateur peut continuer à
+    // vérifier les mises à jour du service worker sur une copie de
+    // service-worker.js mise en cache par le HTTP normal, et ne jamais
+    // détecter qu'il a changé. Ça force toujours une vraie requête réseau
+    // pour CE fichier précis (les autres restent gérés par le SW lui-même).
+    navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' })
+      .then((reg) => reg.update().catch(() => {}))
       .catch(() => {});
   }
 }
