@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v1';
+const CACHE_NAME = 'forme-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -12,6 +12,7 @@ const STATIC_ASSETS = [
   '/js/supabase.js',
   '/js/auth.js',
   '/js/utils.js',
+  '/js/push.js',
   '/js/metrics.js',
   '/js/calories.js',
   '/js/body-map.js',
@@ -42,6 +43,23 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
   self.skipWaiting();
+});
+
+// Notification push reçue depuis le serveur (send-due-notifications) —
+// fonctionne même si l'app/onglet est complètement fermé, contrairement
+// aux notifications locales déclenchées depuis components/timer.js.
+self.addEventListener('push', (event) => {
+  let data = { title: 'Forme', body: '' };
+  try { data = event.data?.json() ?? data; } catch {}
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: 'timer-rest',
+    })
+  );
 });
 
 // Relaie le bouton d'action tapé sur une notif (ex: "+15 s" / "Passer" du

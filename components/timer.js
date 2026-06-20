@@ -1,5 +1,6 @@
 import { formatTime } from '../js/utils.js';
 import { APP_CONFIG } from '../js/config.js';
+import { scheduleRestPush, cancelRestPush } from '../js/push.js';
 
 // Circonférence de l'anneau (r=88): 2π×88 ≈ 552.9
 const CIRCUMFERENCE = 2 * Math.PI * 88;
@@ -12,6 +13,7 @@ let isRunning  = false;
 let minimized  = false;
 let audioCtx   = null;
 let runToken   = 0;       // incrémenté à chaque (re)lancement — évite qu'un auto-close différé ferme un timer relancé entre-temps
+let pendingPushId = null; // id de la notification push serveur programmée pour ce repos
 
 // ── Accesseurs DOM ─────────────────────────────────────────────────────
 
@@ -113,7 +115,11 @@ function adjust(delta) {
   if (totalTime < remaining) totalTime = remaining;
   if (isRunning) endTime = Date.now() + remaining * 1000;
   updateDisplay();
-  if (isRunning) { _lastNotifyUpdate = 0; _maybeRefreshNotification(); }
+  if (isRunning) {
+    _lastNotifyUpdate = 0;
+    _maybeRefreshNotification();
+    _reschedulePush(remaining);
+  }
 }
 
 // ── Minimiser / restaurer ───────────────────────────────────────────────
@@ -277,6 +283,23 @@ export function startRestTimer(seconds = APP_CONFIG.defaultRestTime) {
   updateDisplay();
   start();
   _notifyStart(seconds);
+
+  // Filet de sécurité serveur : ce push arrivera même si l'app est
+  // totalement fermée / l'écran éteint, contrairement à la notif locale
+  // ci-dessus qui dépend du JS de la page (suspendu en arrière-plan).
+  pendingPushId = null;
+  scheduleRestPush(seconds, 'Forme — Repos terminé !', 'C\'est l\'heure de votre prochaine série')
+    .then(id => { pendingPushId = id; });
+}
+
+// Réajuste la notification serveur programmée quand le repos est modifié
+// (+15/-15) — sinon elle arriverait au mauvais moment.
+function _reschedulePush(newRemaining) {
+  const staleId = pendingPushId;
+  pendingPushId = null;
+  cancelRestPush(staleId);
+  scheduleRestPush(newRemaining, 'Forme — Repos terminé !', 'C\'est l\'heure de votre prochaine série')
+    .then(id => { pendingPushId = id; });
 }
 
 export function hideTimer() {
@@ -284,6 +307,8 @@ export function hideTimer() {
   stop();
   minimized = false;
   overlay()?.classList.add('hidden');
+  cancelRestPush(pendingPushId);
+  pendingPushId = null;
 }
 
 export function initTimer() {

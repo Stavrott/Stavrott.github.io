@@ -160,3 +160,49 @@ alter table seances add column if not exists muscles_travailles text[];
 -- ── Disposition personnalisée de l'accueil (voir pages/home.js) ────────
 -- [{id:'week-stats', hidden:false}, ...] — ordre + visibilité par widget.
 alter table profils add column if not exists home_layout jsonb;
+
+-- ── Notifications push (repos fiable même app fermée) ──────────────────
+-- Un appareil = un abonnement Web Push. Géré directement par le client
+-- (RLS classique user_id = auth.uid()).
+create table if not exists push_subscriptions (
+  id          uuid primary key default uuid_generate_v4(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  endpoint    text not null unique,
+  p256dh      text not null,
+  auth_key    text not null,
+  created_at  timestamptz default now()
+);
+alter table push_subscriptions enable row level security;
+create policy "Propres abonnements push" on push_subscriptions for all using (auth.uid() = user_id);
+
+-- File des notifications programmées, gérée uniquement par les Edge
+-- Functions (clé service_role) — pas de policy ouverte au client, RLS
+-- activée mais "deny by default" pour anon/authenticated.
+create table if not exists push_pending (
+  id          uuid primary key default uuid_generate_v4(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  deliver_at  timestamptz not null,
+  title       text not null,
+  body        text,
+  sent        boolean default false,
+  created_at  timestamptz default now()
+);
+alter table push_pending enable row level security;
+create index if not exists idx_push_pending_due on push_pending(deliver_at) where sent = false;
+
+-- ── Tâche planifiée : déclenche l'envoi des notifications dues ─────────
+-- pg_cron ne descend pas sous la minute ; la fonction send-due-notifications
+-- boucle elle-même toutes les ~10s pendant 60s pour une précision correcte.
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+
+select cron.schedule(
+  'send-due-push-notifications',
+  '* * * * *',
+  $$
+  select net.http_post(
+    url := 'https://ytkrjraoqmroankhidip.supabase.co/functions/v1/send-due-notifications',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true))
+  );
+  $$
+);
