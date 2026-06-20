@@ -1,6 +1,6 @@
 import { supabase } from '../js/supabase.js';
-import { currentUser, getUserPrenom } from '../js/auth.js';
-import { lsSet, lsGet, showToast } from '../js/utils.js';
+import { currentUser, getUserPrenom, signOut } from '../js/auth.js';
+import { lsSet, lsGet, showToast, confirmDialog } from '../js/utils.js';
 
 const LS_KEY = (uid) => `onboarding_done_${uid}`;
 
@@ -90,6 +90,9 @@ function _render() {
     <div class="ob-wrapper">
       <div class="ob-card">
         ${isLocalhost ? `<button class="ob-skip" id="ob-skip">Passer l'onboarding</button>` : ''}
+        <button class="ob-cancel" id="ob-cancel" aria-label="Annuler et revenir à la connexion">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
 
         <div class="ob-progress">
           ${Array.from({ length: TOTAL_STEPS }, (_, i) => `
@@ -258,6 +261,7 @@ function _stepEquipements() {
 
 function _bindEvents() {
   document.getElementById('ob-skip')?.addEventListener('click', _skip);
+  document.getElementById('ob-cancel')?.addEventListener('click', _cancel);
   document.getElementById('ob-prev')?.addEventListener('click', _prev);
   document.getElementById('ob-next')?.addEventListener('click', _next);
 
@@ -370,6 +374,15 @@ async function _finish() {
 function _skip() {
   lsSet(LS_KEY(currentUser.id), true);
   _onDone?.();
+}
+
+// Annule l'inscription en cours : aucune réponse n'est encore enregistrée
+// en base à ce stade (seulement en mémoire), donc se déconnecter suffit —
+// onAuthStateChange (js/auth.js) renvoie alors automatiquement vers l'écran
+// de connexion.
+async function _cancel() {
+  if (!await confirmDialog('Annuler l\'inscription et revenir à la connexion ?', { confirmLabel: 'Annuler', danger: false })) return;
+  await signOut();
 }
 
 // ── Util ──────────────────────────────────────────────────────────────
