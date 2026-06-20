@@ -192,7 +192,7 @@ create index if not exists idx_push_pending_due on push_pending(deliver_at) wher
 
 -- ── Tâche planifiée : déclenche l'envoi des notifications dues ─────────
 -- pg_cron ne descend pas sous la minute ; la fonction send-due-notifications
--- boucle elle-même toutes les ~10s pendant 60s pour une précision correcte.
+-- boucle elle-même toutes les ~1s pendant ~55s pour une précision correcte.
 -- La clé "anon" suffit ici (déjà publique, cf. js/config.js) : elle ne fait
 -- que passer la vérification JWT de la passerelle Edge Functions. La
 -- fonction utilise elle-même SUPABASE_SERVICE_ROLE_KEY pour ses accès BDD

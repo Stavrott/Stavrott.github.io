@@ -1,5 +1,5 @@
 // Déclenchée toutes les minutes par pg_cron (voir supabase-schema.sql).
-// Boucle elle-même par pas de ~10s pendant ~55s pour une précision
+// Boucle elle-même par pas de ~1s pendant ~55s pour une précision
 // correcte sans dépendre d'une granularité cron à la seconde.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as webpush from 'jsr:@negrel/webpush';
@@ -10,7 +10,7 @@ const VAPID_PUBLIC_JWK = JSON.parse(Deno.env.get('VAPID_PUBLIC_JWK')!);
 const VAPID_PRIVATE_JWK = JSON.parse(Deno.env.get('VAPID_PRIVATE_JWK')!);
 const CONTACT_EMAIL = Deno.env.get('VAPID_CONTACT_EMAIL') || 'mailto:contact@example.com';
 
-const STEP_MS = 10_000;
+const STEP_MS = 1_000;
 const TOTAL_MS = 55_000;
 
 async function sendDue(admin: ReturnType<typeof createClient>, appServer: webpush.ApplicationServer) {
