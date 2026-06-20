@@ -193,6 +193,11 @@ create index if not exists idx_push_pending_due on push_pending(deliver_at) wher
 -- ── Tâche planifiée : déclenche l'envoi des notifications dues ─────────
 -- pg_cron ne descend pas sous la minute ; la fonction send-due-notifications
 -- boucle elle-même toutes les ~10s pendant 60s pour une précision correcte.
+-- La clé "anon" suffit ici (déjà publique, cf. js/config.js) : elle ne fait
+-- que passer la vérification JWT de la passerelle Edge Functions. La
+-- fonction utilise elle-même SUPABASE_SERVICE_ROLE_KEY pour ses accès BDD
+-- privilégiés — cette variable est injectée automatiquement par Supabase,
+-- pas besoin de la stocker nulle part (Vault ou autre).
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 
@@ -202,7 +207,10 @@ select cron.schedule(
   $$
   select net.http_post(
     url := 'https://ytkrjraoqmroankhidip.supabase.co/functions/v1/send-due-notifications',
-    headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true))
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer sb_publishable_bBM2IhLy67iX7-e-n6SaFg__WDrReHj'
+    )
   );
   $$
 );

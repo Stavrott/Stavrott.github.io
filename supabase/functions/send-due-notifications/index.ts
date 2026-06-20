@@ -52,12 +52,11 @@ async function sendDue(admin: ReturnType<typeof createClient>, appServer: webpus
   }
 }
 
-Deno.serve(async (req) => {
-  const auth = req.headers.get('Authorization') ?? '';
-  if (!auth.includes(SERVICE_ROLE_KEY)) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-  }
-
+Deno.serve(async (_req) => {
+  // Pas de vérification d'auth supplémentaire ici : la passerelle Edge
+  // Functions valide déjà le JWT (clé anon, suffisante — voir le cron dans
+  // supabase-schema.sql), et cette fonction n'agit que sur des notifications
+  // déjà dues d'après push_pending, rien qu'un appelant ne contrôle.
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const appServer = await webpush.ApplicationServer.new({
     contactInformation: CONTACT_EMAIL,
