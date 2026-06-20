@@ -16,6 +16,7 @@ let _section    = null;
 let _onFinish   = null;
 let _startTime  = null;
 let _elapsedId  = null;
+let _lastActiveExoIndex = null; // dernier exercice dont une série a été validée — sert à déterminer "en cours" / "prochain" pour la barre flottante
 
 const _uid = () => Math.random().toString(36).slice(2, 10);
 const _esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -23,6 +24,41 @@ const _esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').r
 export function hasActiveSeance()   { return _state !== null; }
 export function getActiveSeance()  { return _state?.seance ?? null; }
 export function getElapsedSeconds() { return _startTime ? Math.floor((Date.now() - _startTime) / 1000) : 0; }
+
+// ── Exercice en cours / suivant (pour la barre flottante) ───────────────
+
+function _pendingExoIndex(fromIndex) {
+  for (let i = fromIndex; i < _state.exercices.length; i++) {
+    if (_state.exercices[i].sets.some(s => !s.done)) return i;
+  }
+  return -1;
+}
+
+// Exercice actuellement travaillé : le dernier dont une série a été validée,
+// sinon le premier qui a encore des séries à faire.
+export function getCurrentExerciceNom() {
+  if (!_state?.exercices?.length) return null;
+  const idx = _lastActiveExoIndex ?? _pendingExoIndex(0);
+  if (idx == null || idx === -1) return _state.exercices[0].nom;
+  return _state.exercices[idx].nom;
+}
+
+// Pendant le repos : nom de l'exercice de la prochaine série (même exercice
+// s'il reste des séries, sinon le prochain exercice avec des séries en attente).
+export function getNextExerciceNom() {
+  if (!_state?.exercices?.length) return null;
+  const idx = _lastActiveExoIndex ?? _pendingExoIndex(0);
+  if (idx == null || idx === -1) return null;
+  const exo = _state.exercices[idx];
+  if (exo.sets.some(s => !s.done)) return exo.nom;
+  const nextIdx = _pendingExoIndex(idx + 1);
+  return nextIdx !== -1 ? _state.exercices[nextIdx].nom : null;
+}
+
+export function requestFinishSeance() {
+  if (!_state) return;
+  _confirmFinish();
+}
 
 // ── Démarrer ──────────────────────────────────────────────────────────
 
@@ -38,6 +74,7 @@ export async function startSeance(nom, section, onFinish) {
   _section   = section;
   _onFinish  = onFinish;
   _startTime = Date.now();
+  _lastActiveExoIndex = null;
 
   render();
   _elapsedId = setInterval(_tickElapsed, 1000);
@@ -413,6 +450,7 @@ async function _toggleDone(ei, si) {
   if (!set.done) {
     set.done  = true;
     set.repos = set.repos ?? APP_CONFIG.defaultRestTime;
+    _lastActiveExoIndex = ei;
 
     const row = {
       user_id:       currentUser.id,
@@ -447,6 +485,8 @@ async function _toggleDone(ei, si) {
 // Valide un round entier de superset (tous les exercices du groupe en une
 // fois, comme on les enchaîne réellement sans repos entre eux).
 async function _toggleRound(indices, r) {
+  _lastActiveExoIndex = indices.at(-1);
+
   for (const ei of indices) {
     const exo = _state.exercices[ei];
     const set = exo?.sets[r];
@@ -728,5 +768,6 @@ function _reset() {
   _elapsedId = null;
   const onFinish = _onFinish;
   _state = _section = _onFinish = _startTime = null;
+  _lastActiveExoIndex = null;
   if (onFinish) onFinish();
 }

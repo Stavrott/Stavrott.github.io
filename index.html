@@ -149,14 +149,20 @@
 
       <!-- Barre flottante persistante : séance en cours / repos minimisé -->
       <div class="floating-bars" id="floating-bars">
-        <button id="active-seance-bar" class="floating-bar hidden" aria-label="Reprendre la séance ou le repos en cours">
+        <div id="active-seance-bar" class="floating-bar hidden" role="button" tabindex="0" aria-label="Reprendre la séance ou le repos en cours">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="asb-chevron"><polyline points="18 15 12 9 6 15"/></svg>
           <span class="asb-dot"></span>
           <span class="asb-info">
             <span class="asb-nom" id="asb-nom"></span>
-            <span class="asb-time" id="asb-time">00:00</span>
+            <span class="asb-meta">
+              <span class="asb-sub" id="asb-sub"></span>
+              <span class="asb-time" id="asb-time">00:00</span>
+            </span>
           </span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="asb-arrow"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
+          <button class="asb-stop" id="asb-stop" aria-label="Terminer la séance">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+          </button>
+        </div>
       </div>
 
       <!-- Navigation inférieure -->
