@@ -10,6 +10,15 @@
 import { supabase } from './supabase.js';
 import { currentUser } from './auth.js';
 import { VAPID_PUBLIC_KEY } from './config.js';
+import { showToast } from './utils.js';
+
+// TEMPORAIRE — diagnostic sur mobile sans devtools. Affiche l'échec en
+// toast (une seule fois par session) en plus du console.error habituel.
+let _warned = false;
+function _warn(msg, e) {
+  console.error(`[push] ${msg}`, e ?? '');
+  if (!_warned) { _warned = true; showToast(`Push: ${msg}`, 'error', 6000); }
+}
 
 function _urlBase64ToUint8Array(base64) {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4);
@@ -25,11 +34,11 @@ let _subscribed = false;
 export async function ensurePushSubscription() {
   if (_subscribed) return true;
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.warn('[push] API non disponible sur ce navigateur');
+    _warn('API non disponible sur ce navigateur');
     return false;
   }
   if (Notification.permission !== 'granted') {
-    console.warn('[push] permission notification =', Notification.permission, '(doit être "granted")');
+    _warn(`permission = "${Notification.permission}" (doit être "granted")`);
     return false;
   }
 
@@ -50,13 +59,13 @@ export async function ensurePushSubscription() {
       p256dh: json.keys.p256dh,
       auth_key: json.keys.auth,
     }, { onConflict: 'endpoint' });
-    if (error) { console.error('[push] échec enregistrement abonnement:', error); return false; }
+    if (error) { _warn('échec enregistrement abonnement', error); return false; }
 
     _subscribed = true;
     console.info('[push] abonnement OK:', json.endpoint);
     return true;
   } catch (e) {
-    console.error('[push] échec subscribe:', e);
+    _warn('échec subscribe', e);
     return false;
   }
 }
@@ -68,7 +77,7 @@ async function _invoke(method, body) {
     console.info('[push]', method, 'schedule-notification ->', data);
     return data;
   } catch (e) {
-    console.error('[push] échec appel schedule-notification:', e);
+    _warn('échec appel schedule-notification', e);
     return null;
   }
 }
