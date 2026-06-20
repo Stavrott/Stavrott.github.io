@@ -24,8 +24,14 @@ let _subscribed = false;
 // permission de notification accordée (cf. initTimer dans timer.js).
 export async function ensurePushSubscription() {
   if (_subscribed) return true;
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
-  if (Notification.permission !== 'granted') return false;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('[push] API non disponible sur ce navigateur');
+    return false;
+  }
+  if (Notification.permission !== 'granted') {
+    console.warn('[push] permission notification =', Notification.permission, '(doit être "granted")');
+    return false;
+  }
 
   try {
     const reg = await navigator.serviceWorker.ready;
@@ -38,16 +44,19 @@ export async function ensurePushSubscription() {
     }
 
     const json = sub.toJSON();
-    await supabase.from('push_subscriptions').upsert({
+    const { error } = await supabase.from('push_subscriptions').upsert({
       user_id: currentUser.id,
       endpoint: json.endpoint,
       p256dh: json.keys.p256dh,
       auth_key: json.keys.auth,
     }, { onConflict: 'endpoint' });
+    if (error) { console.error('[push] échec enregistrement abonnement:', error); return false; }
 
     _subscribed = true;
+    console.info('[push] abonnement OK:', json.endpoint);
     return true;
-  } catch {
+  } catch (e) {
+    console.error('[push] échec subscribe:', e);
     return false;
   }
 }
@@ -56,8 +65,10 @@ async function _invoke(method, body) {
   try {
     const { data, error } = await supabase.functions.invoke('schedule-notification', { method, body });
     if (error) throw error;
+    console.info('[push]', method, 'schedule-notification ->', data);
     return data;
-  } catch {
+  } catch (e) {
+    console.error('[push] échec appel schedule-notification:', e);
     return null;
   }
 }
