@@ -432,7 +432,7 @@ async function boot() {
   await initAuth(_onLoggedIn, showAuth);
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/esse-app/service-worker.js')
+    navigator.serviceWorker.register('/service-worker.js')
       .catch(() => {});
   }
 }

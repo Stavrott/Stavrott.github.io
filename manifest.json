@@ -2,8 +2,8 @@
   "name": "Forme - Suivi Musculation",
   "short_name": "Forme",
   "description": "Application PWA de suivi de musculation, programmes et nutrition",
-  "start_url": "/esse-app/",
-  "scope": "/esse-app/",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#0E0C0A",
@@ -29,13 +29,13 @@
     {
       "name": "Nouvelle séance",
       "short_name": "Séance",
-      "url": "/esse-app/#seances",
+      "url": "/#seances",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
     },
     {
       "name": "Journal nutrition",
       "short_name": "Nutrition",
-      "url": "/esse-app/#nutrition",
+      "url": "/#nutrition",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
     }
   ]

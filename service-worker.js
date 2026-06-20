@@ -1,40 +1,40 @@
-const CACHE_NAME = 'esse-v27';
+const CACHE_NAME = 'forme-v1';
 const STATIC_ASSETS = [
-  '/esse-app/',
-  '/esse-app/index.html',
-  '/esse-app/manifest.json',
-  '/esse-app/css/variables.css',
-  '/esse-app/css/main.css',
-  '/esse-app/css/components.css',
-  '/esse-app/js/app.js',
-  '/esse-app/js/config.js',
-  '/esse-app/js/router.js',
-  '/esse-app/js/supabase.js',
-  '/esse-app/js/auth.js',
-  '/esse-app/js/utils.js',
-  '/esse-app/js/metrics.js',
-  '/esse-app/js/calories.js',
-  '/esse-app/js/body-map.js',
-  '/esse-app/js/exercisedb.js',
-  '/esse-app/js/quick-launch.js',
-  '/esse-app/js/active-bar.js',
-  '/esse-app/pages/home.js',
-  '/esse-app/pages/seances.js',
-  '/esse-app/pages/seance-active.js',
-  '/esse-app/pages/routine-builder.js',
-  '/esse-app/pages/routine-view.js',
-  '/esse-app/pages/programmes.js',
-  '/esse-app/pages/stats.js',
-  '/esse-app/pages/nutrition.js',
-  '/esse-app/pages/exercices.js',
-  '/esse-app/pages/profil.js',
-  '/esse-app/pages/onboarding.js',
-  '/esse-app/components/timer.js',
-  '/esse-app/icons/logo.png',
-  '/esse-app/icons/icon-192.png',
-  '/esse-app/icons/icon-512.png',
-  '/esse-app/icons/icon-180.png',
-  '/esse-app/icons/favicon-32.png',
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/css/variables.css',
+  '/css/main.css',
+  '/css/components.css',
+  '/js/app.js',
+  '/js/config.js',
+  '/js/router.js',
+  '/js/supabase.js',
+  '/js/auth.js',
+  '/js/utils.js',
+  '/js/metrics.js',
+  '/js/calories.js',
+  '/js/body-map.js',
+  '/js/exercisedb.js',
+  '/js/quick-launch.js',
+  '/js/active-bar.js',
+  '/pages/home.js',
+  '/pages/seances.js',
+  '/pages/seance-active.js',
+  '/pages/routine-builder.js',
+  '/pages/routine-view.js',
+  '/pages/programmes.js',
+  '/pages/stats.js',
+  '/pages/nutrition.js',
+  '/pages/exercices.js',
+  '/pages/profil.js',
+  '/pages/onboarding.js',
+  '/components/timer.js',
+  '/icons/logo.png',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/icon-180.png',
+  '/icons/favicon-32.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -56,7 +56,7 @@ self.addEventListener('notificationclick', (event) => {
         list[0].focus();
         list[0].postMessage({ type: 'notification-action', action });
       } else {
-        self.clients.openWindow('/esse-app/');
+        self.clients.openWindow('/');
       }
     })
   );
@@ -110,7 +110,7 @@ self.addEventListener('fetch', (event) => {
         return response;
       }).catch(() => {
         if (request.mode === 'navigate') {
-          return caches.match('/esse-app/index.html');
+          return caches.match('/index.html');
         }
       });
     })

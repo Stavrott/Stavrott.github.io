@@ -204,8 +204,8 @@ function _showNotification(title, body, actions, { silent = false, renotify = tr
   navigator.serviceWorker.ready.then(reg => {
     reg.showNotification(title, {
       body,
-      icon: '/esse-app/icons/icon-192.png',
-      badge: '/esse-app/icons/icon-192.png',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
       tag: 'timer-rest',
       renotify,
       silent,
