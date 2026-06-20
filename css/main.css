@@ -297,6 +297,12 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
 }
 
+.header-logo {
+  width: 20px; height: 20px;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
 /* ── Contenu pages ───────────────────────────────────────────────── */
 .app-main {
   flex: 1;

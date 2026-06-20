@@ -66,7 +66,7 @@ async function _loadList(section, filter) {
 
     if (!data?.length) {
       content.innerHTML = emptyState(
-        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 8 12 12 15 14"/></svg>`,
+        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="8.5 12.5 11 15 16 9"/></svg>`,
         'Aucune séance',
         'Démarrez votre première séance pour commencer votre suivi.',
         null, null
@@ -95,7 +95,7 @@ function _seanceItem(s) {
     <div class="list-item clickable" data-seance-id="${s.id}" data-seance-nom="${s.nom}">
       <div class="item-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="9"/><polyline points="12 8 12 12 15 14"/>
+          <circle cx="12" cy="12" r="9"/><polyline points="8.5 12.5 11 15 16 9"/>
         </svg>
       </div>
       <div class="item-body">

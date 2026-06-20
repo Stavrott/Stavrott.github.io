@@ -130,8 +130,8 @@ function _renderStartButton() {
   return `
     <div class="page-section" data-widget="start-button">
       <button id="btn-start-seance" class="btn btn-primary btn-full btn-lg" style="gap:var(--space-3)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px">
-          <path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/>
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px">
+          <polygon points="6 4 20 12 6 20"/>
         </svg>
         Démarrer une séance
       </button>
@@ -228,7 +228,7 @@ function renderLastSeances(seances) {
     <div class="list-item clickable" data-id="${s.id}">
       <div class="item-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="9"/><polyline points="12 8 12 12 15 14"/>
+          <circle cx="12" cy="12" r="9"/><polyline points="8.5 12.5 11 15 16 9"/>
         </svg>
       </div>
       <div class="item-body">
