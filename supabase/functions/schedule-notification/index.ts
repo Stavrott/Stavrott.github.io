@@ -21,10 +21,13 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization') ?? '';
-    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    const jwt = authHeader.replace(/^Bearer\s+/i, '');
+    const userClient = createClient(SUPABASE_URL, ANON_KEY);
+    // getUser(jwt) vérifie le jeton passé explicitement — getUser() sans
+    // argument lit l'état de session interne du SDK, qui n'existe pas ici
+    // (chaque appel d'Edge Function part d'un client neuf) et renvoyait
+    // systématiquement "Auth session missing!".
+    const { data: { user }, error: authError } = await userClient.auth.getUser(jwt);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized', reason: authError?.message ?? 'no user', hadAuthHeader: !!authHeader }), { status: 401, headers: CORS_HEADERS });
     }
