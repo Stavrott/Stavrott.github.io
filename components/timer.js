@@ -326,8 +326,14 @@ export function initTimer() {
 
   // Rattraper la dérive (et déclencher la notif si le temps est déjà
   // écoulé) dès que l'app redevient visible — utile quand les timers JS
-  // sont throttlés ou suspendus en arrière-plan.
+  // sont throttlés ou suspendus en arrière-plan (écran verrouillé, app
+  // pas au premier plan). `focus`/`pageshow` sont redondants avec
+  // `visibilitychange` mais certains navigateurs Android/PWA installées
+  // ne déclenchent pas ce dernier de façon fiable.
+  const catchUp = () => { if (isRunning) tick(); };
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && isRunning) tick();
+    if (document.visibilityState === 'visible') catchUp();
   });
+  window.addEventListener('focus', catchUp);
+  window.addEventListener('pageshow', catchUp);
 }
