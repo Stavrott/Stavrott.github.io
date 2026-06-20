@@ -11,6 +11,7 @@ let endTime    = 0;       // timestamp absolu de fin — sert à corriger toute 
 let isRunning  = false;
 let minimized  = false;
 let audioCtx   = null;
+let runToken   = 0;       // incrémenté à chaque (re)lancement — évite qu'un auto-close différé ferme un timer relancé entre-temps
 
 // ── Accesseurs DOM ─────────────────────────────────────────────────────
 
@@ -71,7 +72,11 @@ function tick() {
     stop();
     updateDisplay();
     _notifyEnd();
-    minimized = false;
+    // Se referme seule après un court délai (le temps de voir/entendre la
+    // fin du repos) plutôt que de rester ouverte en attendant un tap sur
+    // "passer le repos". `token` évite de fermer un timer relancé depuis.
+    const token = runToken;
+    setTimeout(() => { if (runToken === token) hideTimer(); }, 1200);
     return;
   }
   updateDisplay();
@@ -203,6 +208,7 @@ function _notifyEnd() {
 // ── API publique ───────────────────────────────────────────────────────
 
 export function startRestTimer(seconds = APP_CONFIG.defaultRestTime) {
+  runToken++;
   totalTime = seconds;
   remaining = seconds;
   minimized = false;
@@ -220,6 +226,7 @@ export function startRestTimer(seconds = APP_CONFIG.defaultRestTime) {
 }
 
 export function hideTimer() {
+  runToken++;
   stop();
   minimized = false;
   overlay()?.classList.add('hidden');

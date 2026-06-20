@@ -1,6 +1,12 @@
-// Barre persistante affichant la séance en cours, ou le minuteur de repos
-// minimisé, sur toutes les pages (sauf Séances elle-même qui a déjà sa
-// propre barre — sauf si c'est le repos qui doit s'afficher, plus utile).
+// Barre persistante affichant la séance en cours ou le minuteur de repos
+// minimisé. Le contenu dépend de la page :
+// - Sur la page Séances (qui a déjà sa propre barre inline détaillée),
+//   cette barre flottante ne concerne QUE le repos minimisé — tap pour le
+//   rouvrir.
+// - Sur toute autre page (accueil, etc.), elle concerne toujours la séance
+//   elle-même (jamais le repos, qui est un détail interne à la séance) —
+//   tap pour y retourner ; le repos minimisé s'affichera alors une fois sur
+//   place.
 import { hasActiveSeance, getActiveSeance, getElapsedSeconds, getCurrentExerciceNom, getNextExerciceNom, requestFinishSeance } from '../pages/seance-active.js';
 import { isMinimized, getRemainingSeconds, restoreTimer } from '../components/timer.js';
 import { navigate, getCurrentPage } from './router.js';
@@ -13,7 +19,7 @@ export function initActiveBar() {
   if (!bar) return;
 
   const open = () => {
-    if (isMinimized()) restoreTimer();
+    if (getCurrentPage() === 'seances' && isMinimized()) restoreTimer();
     else navigate('seances');
   };
 
@@ -24,7 +30,6 @@ export function initActiveBar() {
 
   document.getElementById('asb-stop')?.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (isMinimized()) restoreTimer();
     requestFinishSeance();
   });
 
@@ -37,14 +42,15 @@ function _tick() {
   const bar = document.getElementById('active-seance-bar');
   if (!bar) return;
 
-  const restActive   = isMinimized();
-  const seanceActive = hasActiveSeance() && getCurrentPage() !== 'seances';
-  const show = restActive || seanceActive;
+  const onSeancesPage = getCurrentPage() === 'seances';
+  const showRest      = onSeancesPage && isMinimized();
+  const showSeance     = !onSeancesPage && hasActiveSeance();
+  const show           = showRest || showSeance;
 
   bar.classList.toggle('hidden', !show);
   if (!show) return;
 
-  if (restActive) {
+  if (showRest) {
     const next = getNextExerciceNom();
     document.getElementById('asb-nom').textContent  = 'Repos';
     document.getElementById('asb-sub').textContent  = next ? `Prochain : ${next}` : '';

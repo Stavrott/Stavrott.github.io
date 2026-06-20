@@ -98,6 +98,19 @@
 .list-item.clickable:hover  { background: var(--surface-2); }
 .list-item.clickable:active { background: var(--surface-3); }
 
+/* Mode personnalisation accueil — glisser-déposer des widgets */
+.edit-drag-handle { cursor: grab; touch-action: none; flex-shrink: 0; }
+.edit-widget-row.dragging {
+  background: var(--surface-2);
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-lg);
+}
+.edit-row-placeholder {
+  border: 2px dashed var(--border-ember);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
 .item-icon {
   width: 40px; height: 40px;
   border-radius: var(--radius-md);

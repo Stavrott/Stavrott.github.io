@@ -301,25 +301,23 @@ function _editListHTML() {
   return `
     <div class="page-section">
       <h3 class="section-title" style="margin-bottom:var(--space-3)">Personnaliser l'accueil</h3>
+      <p style="font-size:var(--font-size-xs);color:var(--text-muted);margin-bottom:var(--space-3)">
+        Maintenez la poignée pour glisser un bloc à un autre endroit.
+      </p>
       <div style="display:flex;flex-direction:column;gap:6px" id="edit-widget-list">
-        ${_layout.map((w, i) => `
-          <div class="list-item" style="opacity:${w.hidden ? 0.5 : 1}">
+        ${_layout.map((w) => `
+          <div class="list-item edit-widget-row" data-widget-row="${w.id}" style="opacity:${w.hidden ? 0.5 : 1}">
+            <button class="icon-btn edit-drag-handle" data-drag-handle aria-label="Réorganiser ${WIDGETS[w.id]?.label ?? w.id}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/></svg>
+            </button>
             <div class="item-body">
               <p class="item-title">${WIDGETS[w.id]?.label ?? w.id}</p>
             </div>
-            <div style="display:flex;gap:2px;flex-shrink:0">
-              <button class="icon-btn" data-action="up" data-id="${w.id}" ${i === 0 ? 'disabled' : ''} aria-label="Monter">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><polyline points="18 15 12 9 6 15"/></svg>
-              </button>
-              <button class="icon-btn" data-action="down" data-id="${w.id}" ${i === _layout.length - 1 ? 'disabled' : ''} aria-label="Descendre">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
-              <button class="icon-btn" data-action="toggle" data-id="${w.id}" aria-label="${w.hidden ? 'Afficher' : 'Masquer'}">
-                ${w.hidden
-                  ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`
-                  : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`}
-              </button>
-            </div>
+            <button class="icon-btn" data-action="toggle" data-id="${w.id}" aria-label="${w.hidden ? 'Afficher' : 'Masquer'}">
+              ${w.hidden
+                ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`
+                : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`}
+            </button>
           </div>`).join('')}
       </div>
       <button class="btn btn-primary btn-full" id="btn-done-customize" style="margin-top:var(--space-4)">Terminé</button>
@@ -387,24 +385,90 @@ function _bindEditEvents() {
   });
 
   _section.querySelector('#edit-widget-list')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-action]');
+    const btn = e.target.closest('[data-action="toggle"]');
     if (!btn) return;
-    const { action, id } = btn.dataset;
-    const idx = _layout.findIndex(w => w.id === id);
+    const idx = _layout.findIndex(w => w.id === btn.dataset.id);
     if (idx === -1) return;
-
-    if (action === 'up' && idx > 0) {
-      [_layout[idx - 1], _layout[idx]] = [_layout[idx], _layout[idx - 1]];
-    } else if (action === 'down' && idx < _layout.length - 1) {
-      [_layout[idx + 1], _layout[idx]] = [_layout[idx], _layout[idx + 1]];
-    } else if (action === 'toggle') {
-      _layout[idx].hidden = !_layout[idx].hidden;
-    } else {
-      return;
-    }
-
+    _layout[idx].hidden = !_layout[idx].hidden;
     _saveLayout(_layout);
     _render();
+  });
+
+  _bindDragReorder(_section.querySelector('#edit-widget-list'));
+}
+
+// ── Glisser-déposer pour réordonner (mode édition) ──────────────────────
+// Drag "shadow" classique : l'élément saisi suit le pointeur en position
+// fixe, un espace réservé (placeholder) marque sa future place dans la
+// liste et se déplace au fil du survol des autres lignes.
+
+function _bindDragReorder(listEl) {
+  if (!listEl) return;
+  let dragEl = null, placeholder = null, startY = 0, startTop = 0;
+
+  const onMove = (e) => {
+    if (!dragEl) return;
+    const dy = e.clientY - startY;
+    dragEl.style.top = `${startTop + dy}px`;
+
+    const dragMid = startTop + dy + dragEl.offsetHeight / 2;
+    const rows = [...listEl.querySelectorAll('[data-widget-row]')].filter(r => r !== dragEl);
+
+    let target = null;
+    for (const r of rows) {
+      const rect = r.getBoundingClientRect();
+      if (dragMid < rect.top + rect.height / 2) { target = r; break; }
+    }
+    if (target) listEl.insertBefore(placeholder, target);
+    else listEl.appendChild(placeholder);
+  };
+
+  const onUp = () => {
+    if (!dragEl) return;
+    listEl.insertBefore(dragEl, placeholder);
+    placeholder.remove();
+    dragEl.classList.remove('dragging');
+    dragEl.style.position = dragEl.style.left = dragEl.style.top = dragEl.style.width = '';
+    dragEl.style.zIndex = dragEl.style.pointerEvents = '';
+    document.body.style.userSelect = '';
+
+    const newOrder = [...listEl.querySelectorAll('[data-widget-row]')].map(r => r.dataset.widgetRow);
+    _layout = newOrder.map(id => _layout.find(w => w.id === id)).filter(Boolean);
+    _saveLayout(_layout);
+
+    dragEl = null; placeholder = null;
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+  };
+
+  listEl.querySelectorAll('[data-drag-handle]').forEach(handle => {
+    handle.addEventListener('pointerdown', (e) => {
+      const row = handle.closest('[data-widget-row]');
+      if (!row) return;
+      e.preventDefault();
+
+      dragEl = row;
+      startY = e.clientY;
+      const rect = row.getBoundingClientRect();
+      startTop = rect.top;
+
+      placeholder = document.createElement('div');
+      placeholder.className = 'edit-row-placeholder';
+      placeholder.style.height = `${rect.height}px`;
+      row.after(placeholder);
+
+      row.style.position = 'fixed';
+      row.style.left = `${rect.left}px`;
+      row.style.top = `${rect.top}px`;
+      row.style.width = `${rect.width}px`;
+      row.style.zIndex = '1000';
+      row.style.pointerEvents = 'none';
+      row.classList.add('dragging');
+      document.body.style.userSelect = 'none';
+
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    });
   });
 }
 

@@ -1,7 +1,7 @@
 import { currentUser }               from '../js/auth.js';
 import { supabase }                   from '../js/supabase.js';
 import { showToast, formatTime, openModal, closeModal, confirmDialog } from '../js/utils.js';
-import { startRestTimer }             from '../components/timer.js';
+import { startRestTimer, hideTimer }  from '../components/timer.js';
 import { APP_CONFIG }                 from '../js/config.js';
 import { metricFields, parseFieldValue, fieldByKey, FIELD_DB_COLUMN, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
 import { estimateCaloriesSeance, musclesTravailles } from '../js/calories.js';
@@ -26,33 +26,75 @@ export function getActiveSeance()  { return _state?.seance ?? null; }
 export function getElapsedSeconds() { return _startTime ? Math.floor((Date.now() - _startTime) / 1000) : 0; }
 
 // ── Exercice en cours / suivant (pour la barre flottante) ───────────────
+// Raisonne par bloc (exercice seul OU superset/triset entier), pas par
+// exercice isolé : dans un superset, le repos n'intervient qu'après le
+// dernier exercice du round — le "prochain" ne doit donc jamais être un
+// exercice du même round déjà fait, mais soit le round suivant du même
+// superset, soit le bloc suivant.
 
-function _pendingExoIndex(fromIndex) {
-  for (let i = fromIndex; i < _state.exercices.length; i++) {
-    if (_state.exercices[i].sets.some(s => !s.done)) return i;
+function _blockRoundsTotal(block) {
+  return block.type === 'single'
+    ? _state.exercices[block.index].sets.length
+    : Math.max(...block.indices.map(i => _state.exercices[i].sets.length));
+}
+
+function _blockRoundDone(block, r) {
+  return block.type === 'single'
+    ? _state.exercices[block.index].sets[r]?.done === true
+    : block.indices.every(i => _state.exercices[i].sets[r]?.done === true);
+}
+
+function _blockPendingRound(block) {
+  const total = _blockRoundsTotal(block);
+  for (let r = 0; r < total; r++) if (!_blockRoundDone(block, r)) return r;
+  return -1;
+}
+
+function _blockLabel(block) {
+  return block.type === 'single'
+    ? _state.exercices[block.index].nom
+    : block.indices.map(i => _state.exercices[i].nom).join(' + ');
+}
+
+function _findBlockContaining(blocks, exoIndex) {
+  return blocks.findIndex(b => b.type === 'single' ? b.index === exoIndex : b.indices.includes(exoIndex));
+}
+
+function _firstPendingBlockIndex(blocks, fromBlockIdx) {
+  for (let i = fromBlockIdx; i < blocks.length; i++) {
+    if (_blockPendingRound(blocks[i]) !== -1) return i;
   }
   return -1;
 }
 
-// Exercice actuellement travaillé : le dernier dont une série a été validée,
-// sinon le premier qui a encore des séries à faire.
-export function getCurrentExerciceNom() {
-  if (!_state?.exercices?.length) return null;
-  const idx = _lastActiveExoIndex ?? _pendingExoIndex(0);
-  if (idx == null || idx === -1) return _state.exercices[0].nom;
-  return _state.exercices[idx].nom;
+function _activeBlockIndex(blocks) {
+  let idx = _lastActiveExoIndex != null ? _findBlockContaining(blocks, _lastActiveExoIndex) : -1;
+  if (idx === -1) idx = _firstPendingBlockIndex(blocks, 0);
+  return idx;
 }
 
-// Pendant le repos : nom de l'exercice de la prochaine série (même exercice
-// s'il reste des séries, sinon le prochain exercice avec des séries en attente).
+// Bloc (exercice ou superset) actuellement travaillé : celui du dernier
+// round validé, sinon le premier qui a encore des séries à faire.
+export function getCurrentExerciceNom() {
+  if (!_state?.exercices?.length) return null;
+  const blocks = _buildBlocks(_state.exercices);
+  if (!blocks.length) return null;
+  const idx = _activeBlockIndex(blocks);
+  return _blockLabel(blocks[idx === -1 ? 0 : idx]);
+}
+
+// Pendant le repos : même bloc s'il reste des rounds (ex: round 2 d'un
+// superset), sinon le prochain bloc qui a encore des séries en attente.
 export function getNextExerciceNom() {
   if (!_state?.exercices?.length) return null;
-  const idx = _lastActiveExoIndex ?? _pendingExoIndex(0);
-  if (idx == null || idx === -1) return null;
-  const exo = _state.exercices[idx];
-  if (exo.sets.some(s => !s.done)) return exo.nom;
-  const nextIdx = _pendingExoIndex(idx + 1);
-  return nextIdx !== -1 ? _state.exercices[nextIdx].nom : null;
+  const blocks = _buildBlocks(_state.exercices);
+  if (!blocks.length) return null;
+  const idx = _activeBlockIndex(blocks);
+  if (idx === -1) return null;
+  const block = blocks[idx];
+  if (_blockPendingRound(block) !== -1) return _blockLabel(block);
+  const nextIdx = _firstPendingBlockIndex(blocks, idx + 1);
+  return nextIdx !== -1 ? _blockLabel(blocks[nextIdx]) : null;
 }
 
 export function requestFinishSeance() {
@@ -386,6 +428,7 @@ export async function addExercices(noms) {
 export async function addExercicesFromRoutine(routine) {
   _state.routineId = routine?.id ?? null;
   const exercices = routine?.exercices ?? [];
+  _state.routineExerciceNoms = exercices.map(ex => ex.nom);
   if (!exercices.length) return;
 
   const [perfs, metas] = await Promise.all([
@@ -648,6 +691,7 @@ export async function openExercicePicker() {
 // ── Terminer la séance ────────────────────────────────────────────────
 
 async function _confirmFinish() {
+  if (!_state) return;
   const totalSets = _state.exercices.reduce((n, e) => n + e.sets.filter(s => s.done).length, 0);
   const duree     = _elapsedMinutes();
 
@@ -658,6 +702,15 @@ async function _confirmFinish() {
     }
     return;
   }
+
+  // Garde-fou supplémentaire avant d'ouvrir le récapitulatif détaillé — la
+  // séance peut être terminée depuis n'importe où (bouton en haut de la
+  // page, ou raccourci poubelle de la barre flottante), donc un tap
+  // accidentel ne doit jamais suffire à elle seul.
+  if (!await confirmDialog('Voulez-vous vraiment terminer cette séance ?', { confirmLabel: 'Terminer', danger: false })) return;
+
+  const doneNoms = new Set(_state.exercices.filter(e => e.sets.some(s => s.done)).map(e => e.nom));
+  const missingFromRoutine = (_state.routineExerciceNoms ?? []).filter(nom => !doneNoms.has(nom));
 
   const poidsKg  = await getPoidsActuel();
   const calories = estimateCaloriesSeance(_state.exercices, duree, poidsKg);
@@ -687,6 +740,11 @@ async function _confirmFinish() {
           <p style="font-size:var(--font-size-xs);color:var(--text-muted);margin-top:var(--space-2);text-align:center">
             Renseignez votre poids dans votre <a href="#" id="link-profil-poids" style="color:var(--color-primary);font-weight:700">profil</a> pour estimer les calories.
           </p>` : ''}
+        ${missingFromRoutine.length ? `
+          <div style="margin-top:var(--space-3);padding:var(--space-3);background:var(--color-warning-light);border-radius:var(--radius-md)">
+            <p style="font-size:var(--font-size-xs);font-weight:700;color:var(--color-warning)">⚠️ Exercices de la routine non réalisés</p>
+            <p style="font-size:var(--font-size-xs);color:var(--text-secondary);margin-top:2px">${missingFromRoutine.map(_esc).join(', ')}</p>
+          </div>` : ''}
         ${muscles.length ? `
           <div style="margin-top:var(--space-4)">
             <p class="form-label" style="margin-bottom:var(--space-2)">Muscles travaillés</p>
@@ -766,6 +824,7 @@ async function _syncRoutineProgress() {
 function _reset() {
   clearInterval(_elapsedId);
   _elapsedId = null;
+  hideTimer(); // une séance terminée/annulée ne doit pas laisser un repos en cours derrière elle
   const onFinish = _onFinish;
   _state = _section = _onFinish = _startTime = null;
   _lastActiveExoIndex = null;
