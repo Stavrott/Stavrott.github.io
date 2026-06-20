@@ -1,7 +1,7 @@
 import { currentUser, getUserPrenom } from '../js/auth.js';
 import { supabase }                   from '../js/supabase.js';
 import { navigate }                   from '../js/router.js';
-import { formatDate, getGreeting, todayStr, formatDuration, calc1RM, showToast, confirmDialog, escapeHtml } from '../js/utils.js';
+import { formatDate, getGreeting, todayStr, formatDuration, showToast, confirmDialog, escapeHtml } from '../js/utils.js';
 import { openQuickLaunchModal }       from '../js/quick-launch.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 
@@ -38,8 +38,6 @@ async function fetchDashboard(userId) {
   };
 }
 
-// ── Rendu HTML ────────────────────────────────────────────────────────
-
 function _muscleCounts(seances) {
   const counts = new Map();
   for (const s of seances) {
@@ -48,6 +46,151 @@ function _muscleCounts(seances) {
     }
   }
   return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+function _buildCtx(prenom, dash) {
+  const seancesCount = dash.seancesWeek.length;
+  const totalMin     = dash.seancesWeek.reduce((s, x) => s + (x.duree_minutes || 0), 0);
+  const weekCalories = dash.seancesWeek.reduce((s, x) => s + (x.calories_estimees || 0), 0);
+  const weekMuscles  = _muscleCounts(dash.seancesWeek);
+  return { prenom, dash, seancesCount, totalMin, weekCalories, weekMuscles };
+}
+
+// ── Widgets de l'accueil ────────────────────────────────────────────────
+// Chaque widget rend son propre wrapper complet (avec data-widget="id") afin
+// que le mode personnalisation puisse réordonner/masquer sans connaître les
+// détails de mise en page de chacun.
+
+const WIDGETS = {
+  greeting:       { label: 'Salutation',              render: _renderGreeting },
+  'week-stats':   { label: 'Stats de la semaine',     render: _renderWeekStats },
+  'week-activity': { label: 'Activité de la semaine', render: _renderWeekActivity },
+  'start-button': { label: 'Bouton démarrer',         render: _renderStartButton },
+  shortcuts:      { label: 'Raccourcis',              render: _renderShortcuts },
+  muscles:        { label: 'Muscles travaillés',      render: _renderMuscles },
+  'last-seances': { label: 'Dernières séances',       render: _renderLastSeancesWidget },
+};
+
+const DEFAULT_LAYOUT = Object.keys(WIDGETS).map(id => ({ id, hidden: false }));
+
+function _renderGreeting(ctx) {
+  return `
+    <div class="page-section" data-widget="greeting">
+      <h2 style="font-size:var(--font-size-2xl);font-weight:800;margin-bottom:4px">
+        ${getGreeting()}, ${escapeHtml(ctx.prenom)} 👋
+      </h2>
+      <p style="color:var(--text-secondary);font-size:var(--font-size-sm)">
+        ${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+      </p>
+    </div>`;
+}
+
+function _renderWeekStats(ctx) {
+  const { seancesCount, totalMin, weekCalories } = ctx;
+  return `
+    <div class="grid-3 page-section" data-widget="week-stats">
+      <div class="card card-gradient">
+        <p class="card-title" style="color:rgba(255,255,255,0.7)">Séances</p>
+        <p class="card-value" style="color:white">${seancesCount}</p>
+      </div>
+      <div class="card">
+        <p class="card-title">Temps</p>
+        <p class="card-value">${totalMin >= 60 ? Math.floor(totalMin/60) + 'h' + String(totalMin%60).padStart(2,'0') : totalMin} <span>${totalMin >= 60 ? '' : 'min'}</span></p>
+      </div>
+      <div class="card">
+        <p class="card-title">Calories</p>
+        <p class="card-value">${weekCalories}<span> kcal</span></p>
+      </div>
+    </div>`;
+}
+
+function _renderWeekActivity(ctx) {
+  return `
+    <div class="card page-section" data-widget="week-activity">
+      <p class="card-title" style="margin-bottom:var(--space-3)">Activité de la semaine</p>
+      <div class="week-dots" style="justify-content:space-around">
+        ${renderWeekDots(ctx.dash.seancesWeek)}
+      </div>
+    </div>`;
+}
+
+function _renderMuscles(ctx) {
+  if (!ctx.weekMuscles.length) return '';
+  return `
+    <div class="card page-section" data-widget="muscles" style="padding:var(--space-4)">
+      <p class="card-title" style="margin-bottom:var(--space-3)">Muscles travaillés</p>
+      ${bodyMapHTML('home')}
+      <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:center;margin-top:var(--space-3)">
+        ${ctx.weekMuscles.map(([m, c]) => `<span class="muscle-tag">${escapeHtml(m)}${c > 1 ? ` ×${c}` : ''}</span>`).join('')}
+      </div>
+    </div>`;
+}
+
+function _renderStartButton() {
+  return `
+    <div class="page-section" data-widget="start-button">
+      <button id="btn-start-seance" class="btn btn-primary btn-full btn-lg" style="gap:var(--space-3)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px">
+          <path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/>
+        </svg>
+        Démarrer une séance
+      </button>
+    </div>`;
+}
+
+function _renderShortcuts() {
+  return `
+    <div class="grid-2 page-section" data-widget="shortcuts">
+      <button class="card card-interactive" data-nav="programmes" style="text-align:left">
+        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
+          <div class="item-icon" style="width:36px;height:36px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <span style="font-size:var(--font-size-sm);font-weight:700">Programmes</span>
+        </div>
+        <p style="font-size:var(--font-size-xs);color:var(--text-muted)">PPL, Full Body, 5×5…</p>
+      </button>
+      <button class="card card-interactive" data-nav="stats" style="text-align:left">
+        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
+          <div class="item-icon" style="width:36px;height:36px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </div>
+          <span style="font-size:var(--font-size-sm);font-weight:700">Statistiques</span>
+        </div>
+        <p style="font-size:var(--font-size-xs);color:var(--text-muted)">Records, progression…</p>
+      </button>
+      <button class="card card-interactive" data-nav="nutrition" style="text-align:left">
+        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
+          <div class="item-icon accent" style="width:36px;height:36px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+          </div>
+          <span style="font-size:var(--font-size-sm);font-weight:700">Nutrition</span>
+        </div>
+        <p style="font-size:var(--font-size-xs);color:var(--text-muted)">Calories, macros…</p>
+      </button>
+      <button class="card card-interactive" data-nav="exercices" style="text-align:left">
+        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
+          <div class="item-icon success" style="width:36px;height:36px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+          </div>
+          <span style="font-size:var(--font-size-sm);font-weight:700">Exercices</span>
+        </div>
+        <p style="font-size:var(--font-size-xs);color:var(--text-muted)">Bibliothèque complète</p>
+      </button>
+    </div>`;
+}
+
+function _renderLastSeancesWidget(ctx) {
+  return `
+    <div class="page-section" data-widget="last-seances">
+      <div class="section-header">
+        <h3 class="section-title">Dernières séances</h3>
+        <button class="section-link" data-nav="seances">Voir tout</button>
+      </div>
+      <div class="item-list">
+        ${renderLastSeances(ctx.dash.lastSeances)}
+      </div>
+    </div>`;
 }
 
 function renderWeekDots(seancesWeek) {
@@ -89,14 +232,14 @@ function renderLastSeances(seances) {
         </svg>
       </div>
       <div class="item-body">
-        <p class="item-title">${s.nom || 'Séance'}</p>
+        <p class="item-title">${escapeHtml(s.nom) || 'Séance'}</p>
         <p class="item-subtitle">${formatDate(s.date, { weekday: 'long', year: true })}</p>
       </div>
       <div class="item-meta">
         ${s.duree_minutes ? `<p class="item-meta-primary">${formatDuration(s.duree_minutes)}</p>` : ''}
         ${s.calories_estimees != null ? `<p class="item-meta-secondary">${s.calories_estimees} kcal</p>` : ''}
       </div>
-      <button class="icon-btn" data-del-seance="${s.id}" data-del-nom="${s.nom || 'Séance'}"
+      <button class="icon-btn" data-del-seance="${s.id}" data-del-nom="${escapeHtml(s.nom) || 'Séance'}"
         aria-label="Supprimer" style="color:var(--color-error);flex-shrink:0">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
@@ -117,12 +260,161 @@ async function deleteLastSeance(id, nom, section) {
   }
 }
 
+// ── Disposition personnalisée (mode édition) ────────────────────────────
+
+async function _fetchLayout() {
+  try {
+    const { data } = await supabase.from('profils').select('home_layout').eq('user_id', currentUser.id).maybeSingle();
+    const saved = data?.home_layout;
+    if (!Array.isArray(saved) || !saved.length) return DEFAULT_LAYOUT.map(w => ({ ...w }));
+
+    const merged = saved.filter(w => WIDGETS[w?.id]).map(w => ({ id: w.id, hidden: !!w.hidden }));
+    const knownIds = new Set(merged.map(w => w.id));
+    for (const id of Object.keys(WIDGETS)) {
+      if (!knownIds.has(id)) merged.push({ id, hidden: false });
+    }
+    return merged;
+  } catch {
+    return DEFAULT_LAYOUT.map(w => ({ ...w }));
+  }
+}
+
+async function _saveLayout(layout) {
+  try {
+    await supabase.from('profils').upsert({ user_id: currentUser.id, home_layout: layout }, { onConflict: 'user_id' });
+  } catch {}
+}
+
+function _customizeButtonHTML() {
+  return `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:var(--space-1)">
+      <button id="btn-customize-home" class="icon-btn" aria-label="Personnaliser l'accueil">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+      </button>
+    </div>`;
+}
+
+function _editListHTML() {
+  return `
+    <div class="page-section">
+      <h3 class="section-title" style="margin-bottom:var(--space-3)">Personnaliser l'accueil</h3>
+      <div style="display:flex;flex-direction:column;gap:6px" id="edit-widget-list">
+        ${_layout.map((w, i) => `
+          <div class="list-item" style="opacity:${w.hidden ? 0.5 : 1}">
+            <div class="item-body">
+              <p class="item-title">${WIDGETS[w.id]?.label ?? w.id}</p>
+            </div>
+            <div style="display:flex;gap:2px;flex-shrink:0">
+              <button class="icon-btn" data-action="up" data-id="${w.id}" ${i === 0 ? 'disabled' : ''} aria-label="Monter">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><polyline points="18 15 12 9 6 15"/></svg>
+              </button>
+              <button class="icon-btn" data-action="down" data-id="${w.id}" ${i === _layout.length - 1 ? 'disabled' : ''} aria-label="Descendre">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <button class="icon-btn" data-action="toggle" data-id="${w.id}" aria-label="${w.hidden ? 'Afficher' : 'Masquer'}">
+                ${w.hidden
+                  ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`
+                  : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`}
+              </button>
+            </div>
+          </div>`).join('')}
+      </div>
+      <button class="btn btn-primary btn-full" id="btn-done-customize" style="margin-top:var(--space-4)">Terminé</button>
+      <button class="btn btn-ghost btn-full" id="btn-reset-customize" style="margin-top:var(--space-2);color:var(--text-muted)">Réinitialiser l'ordre</button>
+    </div>`;
+}
+
+// ── État + rendu ──────────────────────────────────────────────────────
+
+let _section  = null;
+let _dashCtx  = null;
+let _layout   = null;
+let _editMode = false;
+
+function _render() {
+  if (!_section || !_dashCtx) return;
+
+  if (_editMode) {
+    _section.innerHTML = _customizeButtonHTML() + _editListHTML();
+    _bindEditEvents();
+    return;
+  }
+
+  const widgetsHtml = _layout
+    .filter(w => !w.hidden)
+    .map(w => WIDGETS[w.id]?.render(_dashCtx) ?? '')
+    .join('');
+
+  _section.innerHTML = _customizeButtonHTML() + widgetsHtml;
+
+  if (_section.querySelector('[data-widget="muscles"]')) {
+    highlightMuscles(_section, groupsFromMuscleNames(_dashCtx.weekMuscles.map(([m]) => m)), 'home');
+  }
+
+  _bindNormalEvents();
+}
+
+function _bindNormalEvents() {
+  _section.querySelector('#btn-customize-home')?.addEventListener('click', () => { _editMode = true; _render(); });
+  _section.querySelector('#btn-start-seance')?.addEventListener('click', () => openQuickLaunchModal());
+
+  _section.querySelectorAll('[data-nav]').forEach((btn) => {
+    btn.addEventListener('click', () => navigate(btn.dataset.nav));
+  });
+
+  _section.querySelectorAll('.item-list [data-id]').forEach((item) => {
+    item.addEventListener('click', () => navigate('seances'));
+  });
+  _section.querySelectorAll('[data-del-seance]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteLastSeance(btn.dataset.delSeance, btn.dataset.delNom, _section);
+    });
+  });
+}
+
+function _bindEditEvents() {
+  _section.querySelector('#btn-customize-home')?.addEventListener('click', () => { _editMode = false; _render(); });
+  _section.querySelector('#btn-done-customize')?.addEventListener('click', () => { _editMode = false; _render(); });
+
+  _section.querySelector('#btn-reset-customize')?.addEventListener('click', () => {
+    _layout = DEFAULT_LAYOUT.map(w => ({ ...w }));
+    _saveLayout(_layout);
+    _render();
+  });
+
+  _section.querySelector('#edit-widget-list')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const { action, id } = btn.dataset;
+    const idx = _layout.findIndex(w => w.id === id);
+    if (idx === -1) return;
+
+    if (action === 'up' && idx > 0) {
+      [_layout[idx - 1], _layout[idx]] = [_layout[idx], _layout[idx - 1]];
+    } else if (action === 'down' && idx < _layout.length - 1) {
+      [_layout[idx + 1], _layout[idx]] = [_layout[idx], _layout[idx + 1]];
+    } else if (action === 'toggle') {
+      _layout[idx].hidden = !_layout[idx].hidden;
+    } else {
+      return;
+    }
+
+    _saveLayout(_layout);
+    _render();
+  });
+}
+
 // ── Export de la page ─────────────────────────────────────────────────
 
 export async function loadHome(section) {
+  _section  = section;
+  _editMode = false;
   const prenom = getUserPrenom();
 
-  // Affichage du squelette
   section.innerHTML = `
     <div class="page-section">
       <div class="skeleton skeleton-title" style="width:55%;margin-bottom:6px"></div>
@@ -133,138 +425,12 @@ export async function loadHome(section) {
       <div class="skeleton skeleton-card"></div>
     </div>`;
 
-  let dash = { seancesWeek: [], seanceToday: null, lastSeances: [] };
-  try {
-    dash = await fetchDashboard(currentUser.id);
-  } catch {}
+  const [dash, layout] = await Promise.all([
+    fetchDashboard(currentUser.id).catch(() => ({ seancesWeek: [], seanceToday: null, lastSeances: [] })),
+    _fetchLayout(),
+  ]);
 
-  const seancesCount = dash.seancesWeek.length;
-  const totalMin      = dash.seancesWeek.reduce((s, x) => s + (x.duree_minutes || 0), 0);
-  const weekCalories  = dash.seancesWeek.reduce((s, x) => s + (x.calories_estimees || 0), 0);
-  const weekMuscles   = _muscleCounts(dash.seancesWeek);
-
-  section.innerHTML = `
-    <!-- Salutation -->
-    <div class="page-section">
-      <h2 style="font-size:var(--font-size-2xl);font-weight:800;margin-bottom:4px">
-        ${getGreeting()}, ${prenom} 👋
-      </h2>
-      <p style="color:var(--text-secondary);font-size:var(--font-size-sm)">
-        ${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-      </p>
-    </div>
-
-    <!-- Stats semaine -->
-    <div class="grid-3 page-section">
-      <div class="card card-gradient">
-        <p class="card-title" style="color:rgba(255,255,255,0.7)">Séances</p>
-        <p class="card-value" style="color:white">${seancesCount}</p>
-      </div>
-      <div class="card">
-        <p class="card-title">Temps</p>
-        <p class="card-value">${totalMin >= 60 ? Math.floor(totalMin/60) + 'h' + String(totalMin%60).padStart(2,'0') : totalMin} <span>${totalMin >= 60 ? '' : 'min'}</span></p>
-      </div>
-      <div class="card">
-        <p class="card-title">Calories</p>
-        <p class="card-value">${weekCalories}<span> kcal</span></p>
-      </div>
-    </div>
-
-    <!-- Activité semaine -->
-    <div class="card page-section">
-      <p class="card-title" style="margin-bottom:var(--space-3)">Activité de la semaine</p>
-      <div class="week-dots" style="justify-content:space-around">
-        ${renderWeekDots(dash.seancesWeek)}
-      </div>
-    </div>
-
-    <!-- Muscles travaillés cette semaine -->
-    ${weekMuscles.length ? `
-    <div class="card page-section" style="padding:var(--space-4)">
-      <p class="card-title" style="margin-bottom:var(--space-3)">Muscles travaillés</p>
-      ${bodyMapHTML('home')}
-      <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:center;margin-top:var(--space-3)">
-        ${weekMuscles.map(([m, c]) => `<span class="muscle-tag">${escapeHtml(m)}${c > 1 ? ` ×${c}` : ''}</span>`).join('')}
-      </div>
-    </div>` : ''}
-
-    <!-- Action principale -->
-    <div class="page-section">
-      <button id="btn-start-seance" class="btn btn-primary btn-full btn-lg" style="gap:var(--space-3)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px">
-          <path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/>
-        </svg>
-        Démarrer une séance
-      </button>
-    </div>
-
-    <!-- Raccourcis -->
-    <div class="grid-2 page-section">
-      <button class="card card-interactive" data-nav="programmes" style="text-align:left">
-        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
-          <div class="item-icon" style="width:36px;height:36px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          </div>
-          <span style="font-size:var(--font-size-sm);font-weight:700">Programmes</span>
-        </div>
-        <p style="font-size:var(--font-size-xs);color:var(--text-muted)">PPL, Full Body, 5×5…</p>
-      </button>
-      <button class="card card-interactive" data-nav="stats" style="text-align:left">
-        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
-          <div class="item-icon" style="width:36px;height:36px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          </div>
-          <span style="font-size:var(--font-size-sm);font-weight:700">Statistiques</span>
-        </div>
-        <p style="font-size:var(--font-size-xs);color:var(--text-muted)">Records, progression…</p>
-      </button>
-      <button class="card card-interactive" data-nav="nutrition" style="text-align:left">
-        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
-          <div class="item-icon accent" style="width:36px;height:36px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-          </div>
-          <span style="font-size:var(--font-size-sm);font-weight:700">Nutrition</span>
-        </div>
-        <p style="font-size:var(--font-size-xs);color:var(--text-muted)">Calories, macros…</p>
-      </button>
-      <button class="card card-interactive" data-nav="exercices" style="text-align:left">
-        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
-          <div class="item-icon success" style="width:36px;height:36px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
-          </div>
-          <span style="font-size:var(--font-size-sm);font-weight:700">Exercices</span>
-        </div>
-        <p style="font-size:var(--font-size-xs);color:var(--text-muted)">Bibliothèque complète</p>
-      </button>
-    </div>
-
-    <!-- Dernières séances -->
-    <div class="page-section">
-      <div class="section-header">
-        <h3 class="section-title">Dernières séances</h3>
-        <button class="section-link" data-nav="seances">Voir tout</button>
-      </div>
-      <div class="item-list">
-        ${renderLastSeances(dash.lastSeances)}
-      </div>
-    </div>`;
-
-  highlightMuscles(section, groupsFromMuscleNames(weekMuscles.map(([m]) => m)), 'home');
-
-  // Événements
-  section.querySelector('#btn-start-seance')?.addEventListener('click', () => openQuickLaunchModal());
-
-  section.querySelectorAll('[data-nav]').forEach((btn) => {
-    btn.addEventListener('click', () => navigate(btn.dataset.nav));
-  });
-
-  section.querySelectorAll('.item-list [data-id]').forEach((item) => {
-    item.addEventListener('click', () => navigate('seances'));
-  });
-  section.querySelectorAll('[data-del-seance]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      deleteLastSeance(btn.dataset.delSeance, btn.dataset.delNom, section);
-    });
-  });
+  _dashCtx = _buildCtx(prenom, dash);
+  _layout  = layout;
+  _render();
 }

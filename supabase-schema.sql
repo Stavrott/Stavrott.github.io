@@ -156,3 +156,7 @@ alter table exercices_custom add column if not exists type_metrique   text defau
 -- ── Calories estimées + muscles travaillés par séance (voir js/calories.js) ────
 alter table seances add column if not exists calories_estimees integer;
 alter table seances add column if not exists muscles_travailles text[];
+
+-- ── Disposition personnalisée de l'accueil (voir pages/home.js) ────────
+-- [{id:'week-stats', hidden:false}, ...] — ordre + visibilité par widget.
+alter table profils add column if not exists home_layout jsonb;
