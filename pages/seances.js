@@ -2,6 +2,7 @@ import { currentUser }       from '../js/auth.js';
 import { supabase }           from '../js/supabase.js';
 import { showToast, formatDate, formatDuration, openModal, closeModal, emptyState, showLoading, hideLoading, confirmDialog, escapeHtml } from '../js/utils.js';
 import { hasActiveSeance, startSeance, resumeActiveView } from './seance-active.js';
+import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 
 // ── Chargement de la page ─────────────────────────────────────────────
 
@@ -479,9 +480,10 @@ async function _openSeanceDetail(seanceId, seanceNom, section) {
         </div>` : ''}
       </div>
       ${muscles.length ? `
-      <div style="margin-bottom:var(--space-5)">
-        <p style="font-weight:800;font-size:var(--font-size-sm);margin-bottom:var(--space-2)">Muscles travaillés</p>
-        <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+      <div class="card" style="margin-bottom:var(--space-5);padding:var(--space-4)">
+        <p style="font-weight:800;font-size:var(--font-size-sm);margin-bottom:var(--space-3)">Muscles travaillés</p>
+        ${bodyMapHTML('detail')}
+        <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:center;margin-top:var(--space-3)">
           ${muscles.map(m => `<span class="muscle-tag">${escapeHtml(m)}</span>`).join('')}
         </div>
       </div>` : ''}
@@ -497,6 +499,8 @@ async function _openSeanceDetail(seanceId, seanceNom, section) {
               </div>`).join('')}
           </div>
         </div>`).join('')}`;
+
+    highlightMuscles(document.getElementById('modal-body'), groupsFromMuscleNames(muscles), 'detail');
   } catch {
     document.getElementById('modal-body').innerHTML = `<p style="color:var(--color-error);text-align:center">Erreur de chargement</p>`;
   }

@@ -1,6 +1,7 @@
 import { currentUser }  from '../js/auth.js';
 import { supabase }     from '../js/supabase.js';
 import { calc1RM, formatDate, svgLineChart, escapeHtml } from '../js/utils.js';
+import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 
 // ── Point d'entrée ────────────────────────────────────────────────────
 
@@ -70,9 +71,10 @@ async function _renderResumes(section) {
           </div>
         </div>
         ${weekMuscles.length ? `
-        <div class="card" style="margin-top:var(--space-3)">
-          <p class="card-title" style="margin-bottom:var(--space-2)">Muscles travaillés</p>
-          <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+        <div class="card" style="margin-top:var(--space-3);padding:var(--space-4)">
+          <p class="card-title" style="margin-bottom:var(--space-3)">Muscles travaillés</p>
+          ${bodyMapHTML('stats-week')}
+          <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:center;margin-top:var(--space-3)">
             ${weekMuscles.map(([m, c]) => `<span class="muscle-tag">${escapeHtml(m)}${c > 1 ? ` ×${c}` : ''}</span>`).join('')}
           </div>
         </div>` : ''}
@@ -106,6 +108,8 @@ async function _renderResumes(section) {
         <p class="card-title">Total séances</p>
         <p class="card-value">${totalCount} <span>depuis le début</span></p>
       </div>`;
+
+    highlightMuscles(content, groupsFromMuscleNames(weekMuscles.map(([m]) => m)), 'stats-week');
   } catch {
     content.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:var(--space-6)">Erreur de chargement</p>`;
   }

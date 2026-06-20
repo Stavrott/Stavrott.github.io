@@ -5,6 +5,7 @@ import { startRestTimer }             from '../components/timer.js';
 import { APP_CONFIG }                 from '../js/config.js';
 import { metricFields, parseFieldValue, fieldByKey, FIELD_DB_COLUMN, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
 import { estimateCaloriesSeance, musclesTravailles } from '../js/calories.js';
+import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 import { getPoidsActuel } from './profil.js';
 import { navigate } from '../js/router.js';
 
@@ -649,7 +650,8 @@ async function _confirmFinish() {
         ${muscles.length ? `
           <div style="margin-top:var(--space-4)">
             <p class="form-label" style="margin-bottom:var(--space-2)">Muscles travaillés</p>
-            <div style="display:flex;flex-wrap:wrap;gap:var(--space-2)">
+            ${bodyMapHTML('finish')}
+            <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:center;margin-top:var(--space-3)">
               ${muscles.map(m => `<span class="muscle-tag">${_esc(m)}</span>`).join('')}
             </div>
           </div>` : ''}
@@ -663,6 +665,8 @@ async function _confirmFinish() {
       <button class="btn btn-secondary" id="btn-continue-seance">Continuer</button>
       <button class="btn btn-primary" id="btn-confirm-finish" style="flex:1">Enregistrer</button>`,
   });
+
+  highlightMuscles(document.getElementById('modal-body'), groupsFromMuscleNames(muscles), 'finish');
 
   document.getElementById('btn-continue-seance')?.addEventListener('click', closeModal);
   document.getElementById('btn-confirm-finish')?.addEventListener('click', () => _doFinish(duree, calories, muscles));

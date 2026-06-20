@@ -1,8 +1,9 @@
 import { currentUser, getUserPrenom } from '../js/auth.js';
 import { supabase }                   from '../js/supabase.js';
 import { navigate }                   from '../js/router.js';
-import { formatDate, getGreeting, todayStr, formatDuration, calc1RM, showToast, confirmDialog } from '../js/utils.js';
+import { formatDate, getGreeting, todayStr, formatDuration, calc1RM, showToast, confirmDialog, escapeHtml } from '../js/utils.js';
 import { openQuickLaunchModal }       from '../js/quick-launch.js';
+import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 
 // ── Données du tableau de bord ────────────────────────────────────────
 
@@ -12,7 +13,7 @@ async function fetchDashboard(userId) {
 
   const [{ data: seancesWeek }, { data: seanceToday }, { data: lastSeance }] = await Promise.all([
     supabase.from('seances')
-      .select('id, date, duree_minutes, nom')
+      .select('id, date, duree_minutes, nom, calories_estimees, muscles_travailles')
       .eq('user_id', userId)
       .gte('date', weekAgo)
       .order('date', { ascending: false }),
@@ -24,7 +25,7 @@ async function fetchDashboard(userId) {
       .maybeSingle(),
 
     supabase.from('seances')
-      .select('id, nom, date, duree_minutes')
+      .select('id, nom, date, duree_minutes, calories_estimees')
       .eq('user_id', userId)
       .order('date', { ascending: false })
       .limit(3),
@@ -38,6 +39,16 @@ async function fetchDashboard(userId) {
 }
 
 // ── Rendu HTML ────────────────────────────────────────────────────────
+
+function _muscleCounts(seances) {
+  const counts = new Map();
+  for (const s of seances) {
+    for (const m of s.muscles_travailles ?? []) {
+      counts.set(m, (counts.get(m) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+}
 
 function renderWeekDots(seancesWeek) {
   const days = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
@@ -83,6 +94,7 @@ function renderLastSeances(seances) {
       </div>
       <div class="item-meta">
         ${s.duree_minutes ? `<p class="item-meta-primary">${formatDuration(s.duree_minutes)}</p>` : ''}
+        ${s.calories_estimees != null ? `<p class="item-meta-secondary">${s.calories_estimees} kcal</p>` : ''}
       </div>
       <button class="icon-btn" data-del-seance="${s.id}" data-del-nom="${s.nom || 'Séance'}"
         aria-label="Supprimer" style="color:var(--color-error);flex-shrink:0">
@@ -127,7 +139,9 @@ export async function loadHome(section) {
   } catch {}
 
   const seancesCount = dash.seancesWeek.length;
-  const totalMin     = dash.seancesWeek.reduce((s, x) => s + (x.duree_minutes || 0), 0);
+  const totalMin      = dash.seancesWeek.reduce((s, x) => s + (x.duree_minutes || 0), 0);
+  const weekCalories  = dash.seancesWeek.reduce((s, x) => s + (x.calories_estimees || 0), 0);
+  const weekMuscles   = _muscleCounts(dash.seancesWeek);
 
   section.innerHTML = `
     <!-- Salutation -->
@@ -141,14 +155,18 @@ export async function loadHome(section) {
     </div>
 
     <!-- Stats semaine -->
-    <div class="grid-2 page-section">
+    <div class="grid-3 page-section">
       <div class="card card-gradient">
-        <p class="card-title" style="color:rgba(255,255,255,0.7)">Cette semaine</p>
-        <p class="card-value" style="color:white">${seancesCount} <span style="color:rgba(255,255,255,0.6)">séance${seancesCount > 1 ? 's' : ''}</span></p>
+        <p class="card-title" style="color:rgba(255,255,255,0.7)">Séances</p>
+        <p class="card-value" style="color:white">${seancesCount}</p>
       </div>
       <div class="card">
-        <p class="card-title">Temps total</p>
+        <p class="card-title">Temps</p>
         <p class="card-value">${totalMin >= 60 ? Math.floor(totalMin/60) + 'h' + String(totalMin%60).padStart(2,'0') : totalMin} <span>${totalMin >= 60 ? '' : 'min'}</span></p>
+      </div>
+      <div class="card">
+        <p class="card-title">Calories</p>
+        <p class="card-value">${weekCalories}<span> kcal</span></p>
       </div>
     </div>
 
@@ -159,6 +177,16 @@ export async function loadHome(section) {
         ${renderWeekDots(dash.seancesWeek)}
       </div>
     </div>
+
+    <!-- Muscles travaillés cette semaine -->
+    ${weekMuscles.length ? `
+    <div class="card page-section" style="padding:var(--space-4)">
+      <p class="card-title" style="margin-bottom:var(--space-3)">Muscles travaillés</p>
+      ${bodyMapHTML('home')}
+      <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:center;margin-top:var(--space-3)">
+        ${weekMuscles.map(([m, c]) => `<span class="muscle-tag">${escapeHtml(m)}${c > 1 ? ` ×${c}` : ''}</span>`).join('')}
+      </div>
+    </div>` : ''}
 
     <!-- Action principale -->
     <div class="page-section">
@@ -220,6 +248,8 @@ export async function loadHome(section) {
         ${renderLastSeances(dash.lastSeances)}
       </div>
     </div>`;
+
+  highlightMuscles(section, groupsFromMuscleNames(weekMuscles.map(([m]) => m)), 'home');
 
   // Événements
   section.querySelector('#btn-start-seance')?.addEventListener('click', () => openQuickLaunchModal());
