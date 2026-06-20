@@ -73,7 +73,14 @@ export async function ensurePushSubscription() {
 async function _invoke(method, body) {
   try {
     const { data, error } = await supabase.functions.invoke('schedule-notification', { method, body });
-    if (error) throw error;
+    if (error) {
+      // FunctionsHttpError expose la vraie réponse (avec le détail qu'on a
+      // ajouté côté fonction) via .context — le message générique seul ne
+      // dit pas pourquoi.
+      let detail = error.message;
+      try { detail = JSON.stringify(await error.context?.json()); } catch {}
+      throw new Error(detail);
+    }
     console.info('[push]', method, 'schedule-notification ->', data);
     return data;
   } catch (e) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v5';
+const CACHE_NAME = 'forme-v6';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -92,6 +92,10 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  // Ignore tout ce qui n'est pas http(s) (ex: chrome-extension://, injecté
+  // par une extension du navigateur) — Cache.put() rejette ces schémas.
+  if (!url.protocol.startsWith('http')) return;
 
   if (url.hostname.includes('supabase.co') || url.hostname.includes('supabase.io')) {
     event.respondWith(

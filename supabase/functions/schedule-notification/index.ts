@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
     });
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: CORS_HEADERS });
+      return new Response(JSON.stringify({ error: 'Unauthorized', reason: authError?.message ?? 'no user', hadAuthHeader: !!authHeader }), { status: 401, headers: CORS_HEADERS });
     }
 
     // Annuler une notification déjà programmée (repos passé/ajusté côté client).
