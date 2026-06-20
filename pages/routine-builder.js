@@ -1,5 +1,5 @@
 import { showToast, confirmDialog } from '../js/utils.js';
-import { getAllExercices }      from './exercices.js';
+import { getAllExercices, openCreateExerciceModal } from './exercices.js';
 import { fetchExerciseImage }  from '../js/exercisedb.js';
 import { metricFields, parseFieldValue, defaultFieldValue, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
 
@@ -465,6 +465,19 @@ async function _pickExo() {
     _renderList();
   };
 
+  // Un exercice "créé" ici doit exister réellement dans la bibliothèque
+  // (table exercices_custom), sinon il est introuvable plus tard dans la
+  // page Exercices — on ouvre donc le vrai formulaire de création (groupe,
+  // muscles…) au lieu de se contenter d'un nom brut local à la routine.
+  const createCustom = raw => {
+    close();
+    openCreateExerciceModal(raw, (newExo) => {
+      _syncDOM();
+      _state.exercices.push(_normalizeExo({ nom: newExo.nom, type_metrique: newExo.type_metrique }));
+      _renderList();
+    });
+  };
+
   const render = () => {
     const filtered = EXERCICES.filter(e => {
       const g = groupe === 'Tous' || e.groupe === groupe;
@@ -500,8 +513,8 @@ async function _pickExo() {
     const raw  = document.getElementById('rp-search')?.value.trim();
     const wrap = sheet.querySelector('#rp-custom');
     if (raw && !EXERCICES.find(e => e.nom.toLowerCase() === raw.toLowerCase())) {
-      wrap.innerHTML = `<button class="btn btn-secondary btn-full" id="rp-new">+ Créer "${raw}"</button>`;
-      wrap.querySelector('#rp-new')?.addEventListener('click', () => pick(raw));
+      wrap.innerHTML = `<button class="btn btn-secondary btn-full" id="rp-new">+ Créer "${_esc(raw)}"</button>`;
+      wrap.querySelector('#rp-new')?.addEventListener('click', () => createCustom(raw));
     } else {
       wrap.innerHTML = '';
     }

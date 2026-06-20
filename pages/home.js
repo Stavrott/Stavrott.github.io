@@ -281,8 +281,14 @@ async function _fetchLayout() {
 
 async function _saveLayout(layout) {
   try {
-    await supabase.from('profils').upsert({ user_id: currentUser.id, home_layout: layout }, { onConflict: 'user_id' });
-  } catch {}
+    const { error } = await supabase.from('profils').upsert({ user_id: currentUser.id, home_layout: layout }, { onConflict: 'user_id' });
+    if (error) throw error;
+  } catch {
+    // Le cas le plus probable est l'absence de la colonne home_layout côté
+    // Supabase (migration non exécutée) — on le signale plutôt que de
+    // laisser l'utilisateur croire que la personnalisation est enregistrée.
+    showToast('La disposition n\'a pas pu être enregistrée (vérifiez la base Supabase)', 'error', 5000);
+  }
 }
 
 function _customizeButtonHTML() {

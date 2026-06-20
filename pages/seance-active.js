@@ -670,10 +670,12 @@ export async function openExercicePicker() {
     if (wrap) {
       const exists = EXERCICES.some(ex => ex.nom.toLowerCase() === raw.toLowerCase());
       wrap.innerHTML = raw && !exists
-        ? `<button class="btn btn-secondary btn-full" id="picker-custom">+ Ajouter "${raw}"</button>`
+        ? `<button class="btn btn-secondary btn-full" id="picker-custom">+ Créer "${_esc(raw)}"</button>`
         : '';
-      document.getElementById('picker-custom')?.addEventListener('click', () => {
-        closeModal(); addExercice(raw);
+      document.getElementById('picker-custom')?.addEventListener('click', async () => {
+        closeModal();
+        const { openCreateExerciceModal } = await import('./exercices.js');
+        openCreateExerciceModal(raw, (newExo) => addExercice(newExo.nom));
       });
     }
   });

@@ -641,8 +641,51 @@ async function _loadGif(exo) {
 }
 
 // ── Créer un exercice custom ──────────────────────────────────────────
+// Exporté pour que d'autres flux de création rapide (routine-builder,
+// séance en cours) ouvrent le même formulaire complet au lieu d'ajouter
+// un nom brut qui ne serait jamais retrouvable dans la bibliothèque.
 
-function _openCreateModal() {
+const MUSCLE_CATEGORIES = {
+  'Poitrine':   ['Pectoraux', 'Pectoraux supérieurs', 'Pectoraux inférieurs'],
+  'Dos':        ['Grand dorsal', 'Dorsaux', 'Trapèzes', 'Rhomboïdes', 'Érecteurs spinaux'],
+  'Épaules':    ['Épaules', 'Deltoïdes', 'Deltoïdes antérieurs', 'Deltoïdes latéraux', 'Deltoïdes postérieurs'],
+  'Bras':       ['Biceps', 'Biceps brachial', 'Brachial', 'Brachioradial', 'Triceps', 'Triceps long', 'Bras'],
+  'Abdominaux': ["Grand droit de l'abdomen", 'Grand droit', 'Transverse', 'Obliques', 'Abdominaux inférieurs'],
+  'Jambes':     ['Quadriceps', 'Ischio-jambiers', 'Fessiers', 'Abducteurs', 'Adducteurs', 'Fléchisseurs de hanche', 'Mollets', 'Gastrocnémiens', 'Soléaire', 'Jambes'],
+  'Autres':     ['Stabilisateurs', 'Cardio-vasculaire'],
+};
+
+let _selectedMuscles = new Set();
+
+function _muscleTagPickerHTML(preselected = []) {
+  _selectedMuscles = new Set(preselected);
+  return `
+    <div id="ce-muscles-picker" style="display:flex;flex-direction:column;gap:var(--space-3)">
+      ${Object.entries(MUSCLE_CATEGORIES).map(([cat, muscles]) => `
+        <div>
+          <p style="font-size:var(--font-size-xs);font-weight:700;color:var(--text-muted);margin-bottom:var(--space-2)">${cat}</p>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${muscles.map(m => `<div class="chip ${_selectedMuscles.has(m) ? 'active' : ''}" data-muscle="${_esc(m)}">${m}</div>`).join('')}
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function _bindMuscleTagPicker() {
+  document.getElementById('ce-muscles-picker')?.addEventListener('click', e => {
+    const chip = e.target.closest('[data-muscle]');
+    if (!chip) return;
+    const m = chip.dataset.muscle;
+    if (_selectedMuscles.has(m)) { _selectedMuscles.delete(m); chip.classList.remove('active'); }
+    else { _selectedMuscles.add(m); chip.classList.add('active'); }
+  });
+}
+
+function _esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+export function openCreateExerciceModal(prefillNom = '', onCreated = null) {
   const GROUPES_ALL = [...GROUPES_BASE, 'Cardio', 'Mobilité', 'Autre'];
 
   openModal({
@@ -651,7 +694,7 @@ function _openCreateModal() {
       <div style="display:flex;flex-direction:column;gap:var(--space-4)">
         <div class="form-group">
           <label class="form-label">Nom de l'exercice *</label>
-          <input class="form-input" id="ce-nom" type="text" placeholder="ex: Curl marteau unilatéral" autocomplete="off">
+          <input class="form-input" id="ce-nom" type="text" placeholder="ex: Curl marteau unilatéral" autocomplete="off" value="${_esc(prefillNom)}">
         </div>
         <div class="form-group">
           <label class="form-label">Groupe musculaire *</label>
@@ -672,7 +715,7 @@ function _openCreateModal() {
         </div>
         <div class="form-group">
           <label class="form-label">Muscles ciblés</label>
-          <input class="form-input" id="ce-muscles" type="text" placeholder="ex: Biceps, Brachioradial (séparés par des virgules)">
+          ${_muscleTagPickerHTML()}
         </div>
         <div class="form-group">
           <label class="form-label">Description (facultatif)</label>
@@ -684,34 +727,42 @@ function _openCreateModal() {
       <button class="btn btn-primary" id="ce-save" style="flex:1">Créer l'exercice</button>`,
   });
 
-  setTimeout(() => document.getElementById('ce-nom')?.focus(), 80);
+  setTimeout(() => { const i = document.getElementById('ce-nom'); if (i) { i.focus(); if (prefillNom) i.select(); } }, 80);
+  _bindMuscleTagPicker();
   document.getElementById('ce-cancel')?.addEventListener('click', closeModal);
-  document.getElementById('ce-save')?.addEventListener('click', _saveCustom);
+  document.getElementById('ce-save')?.addEventListener('click', () => _saveCustom(onCreated));
 }
 
-async function _saveCustom() {
+function _openCreateModal() {
+  openCreateExerciceModal();
+}
+
+async function _saveCustom(onCreated) {
   const nom      = document.getElementById('ce-nom')?.value.trim();
   const groupe   = document.getElementById('ce-groupe')?.value;
   const materiel = document.getElementById('ce-materiel')?.value.trim() || 'Aucun';
   const typeMetrique = document.getElementById('ce-type-metrique')?.value || DEFAULT_METRIC_TYPE;
-  const musclesRaw = document.getElementById('ce-muscles')?.value.trim();
-  const muscles  = musclesRaw ? musclesRaw.split(',').map(m => m.trim()).filter(Boolean) : [];
+  const muscles  = [..._selectedMuscles];
   const desc     = document.getElementById('ce-desc')?.value.trim();
 
   if (!nom) { showToast('Entrez un nom d\'exercice', 'warning'); return; }
 
   showLoading();
   try {
-    const { error } = await supabase.from('exercices_custom').insert({
+    const { data, error } = await supabase.from('exercices_custom').insert({
       user_id: currentUser.id, nom, groupe, materiel, muscles, description: desc || null,
       type_metrique: typeMetrique,
-    });
+    }).select().single();
     if (error) throw error;
     _customCache = null;
     closeModal();
     showToast(`"${nom}" ajouté à vos exercices`, 'success');
-    _activeTab = 'mes';
-    _section.querySelector('[data-tab="mes"]')?.click();
+    if (onCreated) {
+      onCreated({ ...data, custom: true });
+    } else {
+      _activeTab = 'mes';
+      _section?.querySelector('[data-tab="mes"]')?.click();
+    }
   } catch {
     showToast('Erreur lors de la création', 'error');
   } finally {
