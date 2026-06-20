@@ -89,9 +89,9 @@ function _renderWeekStats(ctx) {
   const { seancesCount, totalMin, weekCalories } = ctx;
   return `
     <div class="grid-3 page-section" data-widget="week-stats">
-      <div class="card card-gradient">
-        <p class="card-title" style="color:rgba(255,255,255,0.7)">Séances</p>
-        <p class="card-value" style="color:white">${seancesCount}</p>
+      <div class="card">
+        <p class="card-title">Séances</p>
+        <p class="card-value">${seancesCount}</p>
       </div>
       <div class="card">
         <p class="card-title">Temps</p>
@@ -228,7 +228,7 @@ function renderLastSeances(seances) {
     <div class="list-item clickable" data-id="${s.id}">
       <div class="item-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/>
+          <circle cx="12" cy="12" r="9"/><polyline points="12 8 12 12 15 14"/>
         </svg>
       </div>
       <div class="item-body">

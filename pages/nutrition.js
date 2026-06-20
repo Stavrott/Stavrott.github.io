@@ -60,19 +60,19 @@ async function renderJournal(section, date) {
 
     content.innerHTML = `
       <!-- Résumé calories -->
-      <div class="card page-section" style="background:var(--color-primary-grad);border:none;color:white">
+      <div class="card page-section">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:var(--space-3)">
           <div>
-            <p style="font-size:var(--font-size-xs);font-weight:600;opacity:0.8;text-transform:uppercase;letter-spacing:.05em">Calories aujourd'hui</p>
-            <p style="font-size:var(--font-size-3xl);font-weight:800;margin-top:4px">${totaux.calories} <span style="font-size:var(--font-size-md);opacity:0.7">/ ${obj.calories} kcal</span></p>
+            <p style="font-size:var(--font-size-xs);font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Calories aujourd'hui</p>
+            <p style="font-size:var(--font-size-3xl);font-weight:800;margin-top:4px;color:var(--color-primary)">${totaux.calories} <span style="font-size:var(--font-size-md);color:var(--text-muted)">/ ${obj.calories} kcal</span></p>
           </div>
           <div style="text-align:right">
-            <p style="font-size:var(--font-size-xs);opacity:0.8">Restant</p>
+            <p style="font-size:var(--font-size-xs);color:var(--text-muted)">Restant</p>
             <p style="font-size:var(--font-size-xl);font-weight:800">${Math.max(obj.calories - totaux.calories, 0)}</p>
           </div>
         </div>
-        <div class="progress-bar" style="background:rgba(255,255,255,0.2)">
-          <div class="progress-fill" style="background:rgba(255,255,255,0.9);width:${pct(totaux.calories, obj.calories)}%"></div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:${pct(totaux.calories, obj.calories)}%"></div>
         </div>
       </div>
 

@@ -47,7 +47,7 @@ export async function openQuickLaunchModal() {
             color:var(--text-muted);margin:var(--space-3) 0 2px">Mes routines</p>
           ${routines.map(r => `
             <div class="list-item clickable" data-ql-rid="${r.id}" style="gap:10px">
-              <div class="item-icon" style="background:var(--color-primary-light);color:var(--color-primary);flex-shrink:0">
+              <div class="item-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                   <path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/>
                 </svg>
@@ -64,7 +64,7 @@ export async function openQuickLaunchModal() {
             color:var(--text-muted);margin:var(--space-3) 0 2px">Programmes</p>
           ${programmes.map((p, i) => `
             <div class="list-item clickable" data-ql-prog="${i}" style="gap:10px">
-              <div class="item-icon" style="background:var(--color-primary-light);color:var(--color-primary);flex-shrink:0">
+              <div class="item-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               </div>
               <div class="item-body">

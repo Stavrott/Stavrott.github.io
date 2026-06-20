@@ -104,7 +104,7 @@ async function _renderResumes(section) {
       </div>
 
       <!-- Total -->
-      <div class="card card-gradient page-section">
+      <div class="card page-section">
         <p class="card-title">Total séances</p>
         <p class="card-value">${totalCount} <span>depuis le début</span></p>
       </div>`;
@@ -143,7 +143,7 @@ function _frequencyBars(seances) {
         <div style="width:100%;height:${h || 4}px;
           background:${counts[i] > 0 ? 'var(--color-primary)' : 'var(--surface-3)'};
           border-radius:4px;transition:height .3s;
-          ${counts[i] > 0 ? 'box-shadow:0 2px 6px rgba(232,67,42,.3)' : ''}"></div>
+          ${counts[i] > 0 ? 'box-shadow:0 2px 6px rgba(201, 163, 92,.3)' : ''}"></div>
         <span style="font-size:9px;color:${today ? 'var(--color-primary)' : 'var(--text-muted)'};
           font-weight:${today ? 700 : 500}">${label}</span>
       </div>`;

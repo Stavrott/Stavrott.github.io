@@ -197,7 +197,7 @@ function _routineItem(r) {
           <circle cx="15" cy="5"  r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="15" cy="19" r="1.4"/>
         </svg>
       </div>
-      <div class="item-icon" style="background:var(--color-primary-light);color:var(--color-primary);flex-shrink:0">
+      <div class="item-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/>
         </svg>
@@ -524,7 +524,7 @@ function _customProgItem(p) {
   const todayJour = (p.structure ?? []).find(j => (j.joursSemaine ?? []).includes(todayDow));
   return `
     <div class="list-item clickable" data-prog-id="${p.id}">
-      <div class="item-icon" ${todayJour ? 'style="background:var(--color-primary-light);color:var(--color-primary)"' : ''}>
+      <div class="item-icon" ${todayJour ? 'style="border-color:var(--color-primary)"' : ''}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
           <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>

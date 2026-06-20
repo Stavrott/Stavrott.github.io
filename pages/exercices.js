@@ -419,7 +419,7 @@ async function _renderMes() {
 
   if (!custom.length) {
     list.innerHTML = emptyState(
-      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/></svg>`,
+      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="18" y2="12"/><rect x="2" y="9" width="4" height="6" rx="1.5"/><rect x="18" y="9" width="4" height="6" rx="1.5"/></svg>`,
       'Aucun exercice custom',
       'Créez des exercices personnalisés pour les retrouver dans vos séances.', null, null
     );
@@ -444,7 +444,7 @@ async function _renderMes() {
 
 const _THUMB_FALLBACK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
   stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;color:var(--text-muted)">
-  <path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/>
+  <line x1="6" y1="12" x2="18" y2="12"/><rect x="2" y="9" width="4" height="6" rx="1.5"/><rect x="18" y="9" width="4" height="6" rx="1.5"/>
 </svg>`;
 
 function _exoItem(e, i, list, showDelete = false) {

@@ -136,9 +136,9 @@ function _render(section, profil, histPoids) {
   section.innerHTML = `
     <!-- Avatar + nom -->
     <div style="display:flex;flex-direction:column;align-items:center;gap:var(--space-3);margin-bottom:var(--space-6)">
-      <div style="width:72px;height:72px;border-radius:var(--radius-full);background:var(--color-primary);
-        display:flex;align-items:center;justify-content:center;color:white;font-weight:900;
-        font-size:2rem;box-shadow:0 4px 16px rgba(232,67,42,.4)">${initial}</div>
+      <div style="width:72px;height:72px;border-radius:var(--radius-full);background:transparent;border:1.5px solid var(--color-primary);
+        display:flex;align-items:center;justify-content:center;color:var(--color-primary);font-weight:900;
+        font-size:2rem">${initial}</div>
       <div style="text-align:center">
         <h2 style="font-weight:900;font-size:var(--font-size-xl)">${prenom}</h2>
         <p style="color:var(--text-muted);font-size:var(--font-size-sm)">${currentUser.email}</p>

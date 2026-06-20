@@ -66,7 +66,7 @@ async function _loadList(section, filter) {
 
     if (!data?.length) {
       content.innerHTML = emptyState(
-        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/></svg>`,
+        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 8 12 12 15 14"/></svg>`,
         'Aucune séance',
         'Démarrez votre première séance pour commencer votre suivi.',
         null, null
@@ -95,7 +95,7 @@ function _seanceItem(s) {
     <div class="list-item clickable" data-seance-id="${s.id}" data-seance-nom="${s.nom}">
       <div class="item-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/>
+          <circle cx="12" cy="12" r="9"/><polyline points="12 8 12 12 15 14"/>
         </svg>
       </div>
       <div class="item-body">
@@ -212,7 +212,7 @@ function _calendarHTML(viewDate, seances) {
         border:${isToday && !isDone ? '2px solid var(--color-primary)' : '2px solid transparent'};
         cursor:${isDone ? 'pointer' : 'default'};
         transition:opacity var(--transition-fast);
-        ${isDone ? 'box-shadow:0 2px 8px rgba(232,67,42,0.35)' : ''}
+        ${isDone ? 'box-shadow:0 2px 8px rgba(201, 163, 92,0.35)' : ''}
       " ${isDone ? `title="Séance enregistrée"` : ''}>
         ${d}
       </div>`;
@@ -334,7 +334,7 @@ async function _renderVolume(section) {
                 ${w.volume > 0 ? `<span style="font-size:9px;color:var(--text-muted);font-weight:700">${w.volume >= 1000 ? (w.volume/1000).toFixed(1)+'t' : w.volume+'kg'}</span>` : '<span></span>'}
                 <div style="width:100%;height:${h}%;background:${isLast ? 'var(--color-primary)' : 'var(--surface-3)'};
                   border-radius:4px 4px 2px 2px;min-height:3px;transition:height .4s;
-                  ${isLast ? 'box-shadow:0 2px 8px rgba(232,67,42,.35)' : ''}"></div>
+                  ${isLast ? 'box-shadow:0 2px 8px rgba(201, 163, 92,.35)' : ''}"></div>
                 <span style="font-size:9px;color:${isLast ? 'var(--color-primary)' : 'var(--text-muted)'};font-weight:${isLast ? 700 : 400}">${w.label}</span>
               </div>`;
           }).join('')}

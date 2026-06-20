@@ -202,7 +202,7 @@ h1, h2, h3, h4, h5, h6 {
 .auth-input:focus {
   border-color: var(--color-primary);
   background: var(--surface-3);
-  box-shadow: 0 0 0 3px rgba(232, 48, 0, 0.15);
+  box-shadow: 0 0 0 3px rgba(201, 163, 92, 0.15);
 }
 
 /* Bouton auth — pill pleine largeur */
@@ -213,7 +213,7 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  box-shadow: 0 6px 28px rgba(232, 48, 0, 0.55), 0 2px 8px rgba(0,0,0,0.40);
+  box-shadow: 0 6px 28px rgba(201, 163, 92, 0.55), 0 2px 8px rgba(0,0,0,0.40);
 }
 .btn-auth:hover { filter: brightness(1.10); }
 
@@ -445,7 +445,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 .nav-item.active svg {
   transform: translateY(-1px);
-  filter: drop-shadow(0 0 6px rgba(232, 48, 0, 0.55));
+  filter: drop-shadow(0 0 6px rgba(201, 163, 92, 0.55));
 }
 
 .nav-item:active { transform: scale(0.88); }
@@ -461,7 +461,7 @@ h1, h2, h3, h4, h5, h6 {
   height: 2px;
   border-radius: 0 0 4px 4px;
   background: var(--color-primary-grad);
-  box-shadow: 0 0 8px rgba(232, 48, 0, 0.60);
+  box-shadow: 0 0 8px rgba(201, 163, 92, 0.60);
 }
 
 /* ── Bouton icône ────────────────────────────────────────────────── */
@@ -493,7 +493,7 @@ h1, h2, h3, h4, h5, h6 {
 .form-textarea {
   width: 100%;
   padding: var(--space-3) var(--space-4);
-  background: var(--surface-2);
+  background: transparent;
   border: 1.5px solid var(--border);
   border-radius: var(--radius-md);
   font-size: var(--font-size-md);
@@ -508,7 +508,7 @@ h1, h2, h3, h4, h5, h6 {
 .form-textarea:focus {
   outline: none;
   border-color: var(--color-primary);
-  background: var(--surface-3);
+  background: transparent;
   box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 .form-input::placeholder { color: var(--text-muted); }
@@ -550,15 +550,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 .btn-primary:hover {
   filter: brightness(1.10);
-  box-shadow: 0 10px 40px rgba(232, 48, 0, 0.58);
+  box-shadow: 0 10px 40px rgba(201, 163, 92, 0.58);
 }
 
 .btn-secondary {
-  background: var(--surface-2);
+  background: transparent;
   color: var(--text-primary);
   border: 1.5px solid var(--border-strong);
 }
-.btn-secondary:hover { background: var(--surface-3); }
+.btn-secondary:hover { background: var(--surface-2); }
 
 .btn-ghost {
   background: transparent;
@@ -756,7 +756,7 @@ h1, h2, h3, h4, h5, h6 {
   padding: var(--space-3) var(--space-6) calc(var(--space-8) + var(--safe-bottom));
   display: flex; flex-direction: column; align-items: center; gap: var(--space-5);
   border-top: 1px solid var(--border-ember);
-  box-shadow: 0 -12px 52px rgba(0,0,0,0.78), 0 -4px 20px rgba(232,48,0,0.10);
+  box-shadow: 0 -12px 52px rgba(0,0,0,0.78), 0 -4px 20px rgba(201, 163, 92,0.10);
   animation: slideUp var(--transition-sheet);
 }
 
@@ -790,7 +790,7 @@ h1, h2, h3, h4, h5, h6 {
   fill: none; stroke: url(#timerGrad); stroke-width: 8; stroke-linecap: round;
   stroke-dasharray: 552; stroke-dashoffset: 0;
   transition: stroke-dashoffset 1s linear, stroke 400ms ease;
-  filter: drop-shadow(0 0 8px rgba(232,48,0,0.55));
+  filter: drop-shadow(0 0 8px rgba(201, 163, 92,0.55));
 }
 .timer-ring-fill.warning { stroke: var(--color-warning); filter: drop-shadow(0 0 6px rgba(245,158,11,0.45)); }
 .timer-ring-fill.done    { stroke: var(--color-success);  filter: drop-shadow(0 0 6px rgba(34,197,94,0.45)); }
