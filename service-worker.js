@@ -1,4 +1,4 @@
-const CACHE_NAME = 'esse-v19';
+const CACHE_NAME = 'esse-v20';
 const STATIC_ASSETS = [
   '/esse-app/',
   '/esse-app/index.html',
@@ -42,6 +42,24 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
   self.skipWaiting();
+});
+
+// Relaie le bouton d'action tapé sur une notif (ex: "+15 s" / "Passer" du
+// minuteur de repos) vers la page ouverte — le SW n'a pas accès à l'état
+// du minuteur, seule la page peut agir.
+self.addEventListener('notificationclick', (event) => {
+  const action = event.action || 'open';
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      if (list.length > 0) {
+        list[0].focus();
+        list[0].postMessage({ type: 'notification-action', action });
+      } else {
+        self.clients.openWindow('/esse-app/');
+      }
+    })
+  );
 });
 
 self.addEventListener('activate', (event) => {

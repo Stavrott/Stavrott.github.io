@@ -192,17 +192,47 @@ function _beep() {
 }
 
 // ── Notifications ──────────────────────────────────────────────────────
+// Affichées via le service worker (et non `new Notification()` directement)
+// pour pouvoir y attacher des boutons d'action — utile en particulier sur
+// montre connectée : les notifs du téléphone s'y reflètent automatiquement
+// via l'OS, boutons inclus, sans rien construire de natif.
+
+function _showNotification(title, body, actions) {
+  if (!('Notification' in window) || Notification.permission !== 'granted' || !('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.ready.then(reg => {
+    reg.showNotification(title, {
+      body,
+      icon: '/esse-app/icons/icon-192.png',
+      badge: '/esse-app/icons/icon-192.png',
+      tag: 'timer-rest',
+      renotify: true,
+      actions,
+    });
+  }).catch(() => {});
+}
+
+function _notifyStart(seconds) {
+  _showNotification('Esse — Repos en cours', `${formatTime(seconds)} avant la prochaine série`, [
+    { action: 'plus15', title: '+15 s' },
+    { action: 'skip',   title: 'Passer' },
+  ]);
+}
 
 function _notifyEnd() {
   _beep();
-  if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification('Esse — Repos terminé !', {
-      body: 'C\'est l\'heure de votre prochaine série',
-      icon: '/esse-app/icons/icon-192.png',
-      tag:  'timer-done',
-    });
-  }
+  _showNotification('Esse — Repos terminé !', 'C\'est l\'heure de votre prochaine série', []);
   if ('vibrate' in navigator) navigator.vibrate([150, 80, 150]);
+}
+
+// Réagit aux boutons d'action tapés sur la notification (relayés par le
+// service worker, qui ne peut pas lui-même toucher l'état du minuteur).
+function _bindNotificationActions() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data?.type !== 'notification-action') return;
+    if (e.data.action === 'plus15') adjust(15);
+    else if (e.data.action === 'skip') hideTimer();
+  });
 }
 
 // ── API publique ───────────────────────────────────────────────────────
@@ -223,6 +253,7 @@ export function startRestTimer(seconds = APP_CONFIG.defaultRestTime) {
   overlay()?.classList.remove('hidden');
   updateDisplay();
   start();
+  _notifyStart(seconds);
 }
 
 export function hideTimer() {
@@ -247,6 +278,7 @@ export function initTimer() {
 
   // Débloquer l'audio dès le premier tap dans l'app (cf. note plus haut)
   document.addEventListener('pointerdown', _unlockAudio, { once: true });
+  _bindNotificationActions();
 
   // Pause / Reprendre
   btnStart()?.addEventListener('click', () => {
