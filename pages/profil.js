@@ -64,6 +64,17 @@ export async function getPoidsActuel() {
   } catch { return null; }
 }
 
+// Données nécessaires au calcul IMC / métabolisme (page Nutrition).
+export async function getProfilPhysique() {
+  try {
+    const [{ data: profil }, poids] = await Promise.all([
+      supabase.from('profils').select('age, sexe, taille_cm, objectif, frequence').eq('user_id', currentUser.id).maybeSingle(),
+      getPoidsActuel(),
+    ]);
+    return { ...(profil ?? {}), poids_kg: poids };
+  } catch { return null; }
+}
+
 export async function getProfilSummary() {
   try {
     const { data } = await supabase

@@ -411,14 +411,18 @@ export async function addExercice(nom, { superset = false } = {}) {
 
   // Chaîne ce nouvel exercice avec le précédent : on retire le repos qui
   // les séparait pour les faire enchaîner sans pause, comme un superset
-  // construit dans le constructeur de routine.
+  // construit dans le constructeur de routine. Le superset se valide round
+  // par round (tous les exercices du bloc en même temps) : il faut donc le
+  // même nombre de séries que le précédent, sinon les rounds en trop n'ont
+  // pas de case à cocher côté nouvel exercice et restent bloqués.
   const prev = _state.exercices.at(-1);
   if (superset && prev) prev.repos_inter = null;
+  const nSets = (superset && prev) ? Math.max(prev.sets.length, 1) : 1;
 
   _state.exercices.push({
     nom, type_metrique, muscles, repos_inter: APP_CONFIG.defaultRestTime,
     lastPerf: perf?.summary ?? null,
-    sets: [_blankSet(fields, perf)],
+    sets: Array.from({ length: nSets }, () => _blankSet(fields, perf)),
   });
 
   render();
@@ -439,10 +443,16 @@ async function _replaceExercice(ei, nom) {
   const fields = metricFields(type_metrique);
   const perf   = await _fetchLastPerf(nom, type_metrique);
 
+  // Garde le même nombre de séries que l'exercice remplacé : s'il fait
+  // partie d'un superset, ses séries servent de "rounds" partagés avec les
+  // autres exercices du bloc — en retomber à une seule série romprait
+  // l'alignement et bloquerait la validation des rounds suivants.
+  const nSets = Math.max(exo.sets.length, 1);
+
   _state.exercices[ei] = {
     nom, type_metrique, muscles, repos_inter: exo.repos_inter,
     lastPerf: perf?.summary ?? null,
-    sets: [_blankSet(fields, perf)],
+    sets: Array.from({ length: nSets }, () => _blankSet(fields, perf)),
   };
 
   render();

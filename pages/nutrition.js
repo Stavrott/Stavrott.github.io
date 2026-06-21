@@ -2,6 +2,8 @@
 import { currentUser }  from '../js/auth.js';
 import { supabase }     from '../js/supabase.js';
 import { showToast, todayStr, formatDate, openModal, confirmDialog } from '../js/utils.js';
+import { calcIMC, imcCategorie, calcMetabolismeBase, calcDepenseTotale, calcCaloriesRecommandees } from '../js/calories.js';
+import { navigate } from '../js/router.js';
 
 export async function loadNutrition(section) {
   section.innerHTML = `
@@ -192,15 +194,60 @@ async function renderObjectifs(section) {
   content.innerHTML = skeletonNutri();
 
   try {
-    const { data: objectifs } = await supabase
-      .from('objectifs_nutrition')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .maybeSingle();
+    const { getProfilPhysique } = await import('./profil.js');
+    const [{ data: objectifs }, physique] = await Promise.all([
+      supabase.from('objectifs_nutrition').select('*').eq('user_id', currentUser.id).maybeSingle(),
+      getProfilPhysique(),
+    ]);
 
     const obj = objectifs || { calories: 2000, proteines: 150, glucides: 200, lipides: 70 };
 
+    const imc  = calcIMC(physique?.poids_kg, physique?.taille_cm);
+    const bmr  = calcMetabolismeBase(physique?.poids_kg, physique?.taille_cm, physique?.age, physique?.sexe);
+    const tdee = calcDepenseTotale(bmr, physique?.frequence);
+    const reco = calcCaloriesRecommandees(tdee, physique?.objectif);
+
     content.innerHTML = `
+      <div class="page-section">
+        <h3 class="section-title" style="margin-bottom:var(--space-3)">Bilan métabolique</h3>
+        ${imc && bmr && tdee ? `
+        <div class="card">
+          <div style="display:flex;justify-content:space-around;text-align:center;gap:var(--space-2)">
+            <div>
+              <p class="card-value" style="font-size:var(--font-size-xl)">${imc.toFixed(1)}</p>
+              <p class="card-label">IMC</p>
+              <p style="font-size:10px;color:var(--text-muted);margin-top:2px">${imcCategorie(imc)}</p>
+            </div>
+            <div>
+              <p class="card-value" style="font-size:var(--font-size-xl)">${bmr}</p>
+              <p class="card-label">Métabolisme de base</p>
+              <p style="font-size:10px;color:var(--text-muted);margin-top:2px">kcal/j au repos</p>
+            </div>
+            <div>
+              <p class="card-value" style="font-size:var(--font-size-xl)">${tdee}</p>
+              <p class="card-label">Dépense totale</p>
+              <p style="font-size:10px;color:var(--text-muted);margin-top:2px">kcal/j estimés</p>
+            </div>
+          </div>
+          ${reco ? `
+          <div style="margin-top:var(--space-4);padding-top:var(--space-4);border-top:1px solid var(--border);
+            display:flex;justify-content:space-between;align-items:center;gap:var(--space-3)">
+            <div>
+              <p class="card-label">Recommandé pour ton objectif</p>
+              <p class="card-value" style="color:var(--color-primary)">${reco}<span class="card-unit"> kcal/j</span></p>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btn-apply-reco">Utiliser</button>
+          </div>` : ''}
+        </div>` : `
+        <div class="card">
+          <p style="color:var(--text-muted);font-size:var(--font-size-sm)">
+            Renseigne ton âge, ta taille, ton sexe, ton poids et ton objectif dans ton
+            <a href="#" id="link-profil-metabo" style="color:var(--color-primary);font-weight:700">profil</a>
+            pour estimer tes besoins caloriques.
+          </p>
+        </div>`}
+      </div>
+
       <div class="page-section">
         <h3 class="section-title" style="margin-bottom:var(--space-3)">Objectifs quotidiens</h3>
         <div class="card" style="display:flex;flex-direction:column;gap:var(--space-4)">
@@ -225,6 +272,16 @@ async function renderObjectifs(section) {
           <button class="btn btn-primary btn-full" id="btn-save-objectifs">Enregistrer</button>
         </div>
       </div>`;
+
+    content.querySelector('#btn-apply-reco')?.addEventListener('click', () => {
+      const inp = content.querySelector('#obj-cal');
+      if (inp) inp.value = reco;
+      showToast('Valeur appliquée — n\'oublie pas d\'enregistrer', 'info');
+    });
+    content.querySelector('#link-profil-metabo')?.addEventListener('click', e => {
+      e.preventDefault();
+      navigate('profil');
+    });
 
     content.querySelector('#btn-save-objectifs')?.addEventListener('click', async () => {
       const calories  = parseFloat(content.querySelector('#obj-cal')?.value)  || 0;

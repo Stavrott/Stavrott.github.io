@@ -26,6 +26,55 @@ export function estimateCaloriesSeance(exercices, dureeMinutes, poidsKg) {
   return Math.round(met * 3.5 * poidsKg / 200 * dureeMinutes);
 }
 
+// ── IMC / métabolisme ────────────────────────────────────────────────────
+// Formule de Mifflin-St Jeor pour le métabolisme de base (plus fiable que
+// Harris-Benedict sur la population générale), puis facteur d'activité
+// physique appliqué à partir de la fréquence d'entraînement renseignée
+// dans le profil (à défaut d'un vrai suivi de l'activité quotidienne).
+
+export function calcIMC(poidsKg, tailleCm) {
+  if (!poidsKg || !tailleCm) return null;
+  const tailleM = tailleCm / 100;
+  return poidsKg / (tailleM * tailleM);
+}
+
+export function imcCategorie(imc) {
+  if (imc == null) return null;
+  if (imc < 18.5) return 'Maigreur';
+  if (imc < 25)   return 'Poids normal';
+  if (imc < 30)   return 'Surpoids';
+  return 'Obésité';
+}
+
+export function calcMetabolismeBase(poidsKg, tailleCm, age, sexe) {
+  if (!poidsKg || !tailleCm || !age) return null;
+  const base = 10 * poidsKg + 6.25 * tailleCm - 5 * age;
+  if (sexe === 'homme') return Math.round(base + 5);
+  if (sexe === 'femme') return Math.round(base - 161);
+  return Math.round(base - 78); // moyenne homme/femme si sexe non précisé
+}
+
+const FACTEUR_ACTIVITE_PAR_FREQUENCE = { 2: 1.375, 3: 1.55, 4: 1.55, 5: 1.725 };
+
+export function calcDepenseTotale(metabolismeBase, frequenceEntrainement) {
+  if (!metabolismeBase) return null;
+  const facteur = FACTEUR_ACTIVITE_PAR_FREQUENCE[frequenceEntrainement] ?? 1.375;
+  return Math.round(metabolismeBase * facteur);
+}
+
+const AJUSTEMENT_KCAL_PAR_OBJECTIF = {
+  hypertrophie: 300,   // léger surplus pour la prise de masse
+  force:        150,
+  seche:       -450,   // déficit modéré, ~0.4-0.5 kg/semaine
+  endurance:    0,
+  maintenance:  0,
+};
+
+export function calcCaloriesRecommandees(depenseTotale, objectif) {
+  if (!depenseTotale) return null;
+  return Math.round(depenseTotale + (AJUSTEMENT_KCAL_PAR_OBJECTIF[objectif] ?? 0));
+}
+
 // ── Muscles travaillés ───────────────────────────────────────────────────
 // Agrège les muscles ciblés des exercices ayant au moins une série validée,
 // triés par fréquence d'apparition décroissante.

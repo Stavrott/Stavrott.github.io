@@ -240,7 +240,7 @@ function _bindEvents() {
     if (!_state.exercices.length || await confirmDialog('Quitter sans sauvegarder ?', { confirmLabel: 'Quitter', danger: false })) _close();
   });
   _el.querySelector('#rb-save')?.addEventListener('click', _save);
-  _el.querySelector('#rb-add-exo')?.addEventListener('click', _pickExo);
+  _el.querySelector('#rb-add-exo')?.addEventListener('click', () => _pickExo());
 
   _el.querySelector('#rb-body')?.addEventListener('click', e => {
     const up = e.target.closest('.rb-up');
@@ -267,8 +267,15 @@ function _bindEvents() {
     const as = e.target.closest('.rb-add-serie');
     if (as) {
       _syncDOM();
-      const ex = _findExo(as.dataset.uid);
-      if (ex) ex.series.push(_newSerie(ex.series.at(-1), ex.type_metrique));
+      const i = _state.exercices.findIndex(x => x.uid === as.dataset.uid);
+      if (i !== -1) {
+        // Un round ajouté à un exercice d'un superset doit l'être pour tout
+        // le bloc, sinon ce round n'a pas d'équivalent côté des autres.
+        _blockIndices(i).forEach(idx => {
+          const ex = _state.exercices[idx];
+          ex.series.push(_newSerie(ex.series.at(-1), ex.type_metrique));
+        });
+      }
       _renderList();
       return;
     }
@@ -276,10 +283,21 @@ function _bindEvents() {
     const ds = e.target.closest('.rb-del-serie');
     if (ds) {
       _syncDOM();
-      const ex = _findExo(ds.dataset.exo);
-      if (ex) {
-        if (ex.series.length <= 1) { showToast('Minimum 1 série', 'warning'); return; }
-        ex.series = ex.series.filter(s => s.uid !== ds.dataset.sid);
+      const i = _state.exercices.findIndex(x => x.uid === ds.dataset.exo);
+      if (i !== -1) {
+        const indices = _blockIndices(i);
+        if (indices.some(idx => _state.exercices[idx].series.length <= 1)) {
+          showToast('Minimum 1 série', 'warning');
+          return;
+        }
+        const ex  = _state.exercices[i];
+        const pos = ex.series.findIndex(s => s.uid === ds.dataset.sid);
+        // Retire le round à la même position chez tous les exercices du
+        // bloc pour garder un nombre de séries identique.
+        indices.forEach(idx => {
+          const e2 = _state.exercices[idx];
+          e2.series.splice(Math.min(pos, e2.series.length - 1), 1);
+        });
       }
       _renderList();
       return;
@@ -311,8 +329,11 @@ function _bindEvents() {
     const addSup = e.target.closest('.rb-add-sup');
     if (addSup) {
       _syncDOM();
-      const ex = _findExo(addSup.dataset.uid);
-      if (ex) ex.repos_inter = null;
+      const i = _state.exercices.findIndex(x => x.uid === addSup.dataset.uid);
+      if (i !== -1 && _state.exercices[i + 1]) {
+        _state.exercices[i].repos_inter = null;
+        _equalizeBlock(_blockIndices(i));
+      }
       _renderList();
       return;
     }
@@ -339,6 +360,27 @@ function _swap(uid, dir) {
 
 function _findExo(uid) {
   return _state.exercices.find(x => x.uid === uid);
+}
+
+// ── Cohérence des supersets ──────────────────────────────────────────────
+// Dans un superset, toutes les séries d'un même round sont validées
+// ensemble en séance — chaque exercice du bloc doit donc garder exactement
+// le même nombre de séries, sinon les rounds en trop n'ont pas d'équivalent
+// côté des autres exercices et restent bloqués au lancement de la séance.
+
+function _blockIndices(i) {
+  let start = i, end = i;
+  while (start > 0 && _state.exercices[start - 1].repos_inter === null) start--;
+  while (_state.exercices[end].repos_inter === null && end + 1 < _state.exercices.length) end++;
+  return Array.from({ length: end - start + 1 }, (_, k) => start + k);
+}
+
+function _equalizeBlock(indices) {
+  const target = Math.max(...indices.map(i => _state.exercices[i].series.length));
+  indices.forEach(i => {
+    const ex = _state.exercices[i];
+    while (ex.series.length < target) ex.series.push(_newSerie(ex.series.at(-1), ex.type_metrique));
+  });
 }
 
 function _syncDOM() {
