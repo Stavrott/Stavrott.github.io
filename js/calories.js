@@ -75,6 +75,26 @@ export function calcCaloriesRecommandees(depenseTotale, objectif) {
   return Math.round(depenseTotale + (AJUSTEMENT_KCAL_PAR_OBJECTIF[objectif] ?? 0));
 }
 
+// Protéines indexées sur le poids de corps (plus fiable qu'un % des
+// calories), lipides à ~25% des calories, glucides en complément du reste —
+// répartition standard en nutrition sportive.
+const PROTEINES_G_PAR_KG_PAR_OBJECTIF = {
+  hypertrophie: 2.0,
+  force:        2.0,
+  seche:        2.2,  // plus élevé en déficit pour préserver la masse musculaire
+  endurance:    1.6,
+  maintenance:  1.8,
+};
+const RATIO_LIPIDES_CALORIES = 0.25;
+
+export function calcMacrosRecommandees(caloriesRecommandees, poidsKg, objectif) {
+  if (!caloriesRecommandees || !poidsKg) return null;
+  const proteines = Math.round(poidsKg * (PROTEINES_G_PAR_KG_PAR_OBJECTIF[objectif] ?? 1.8));
+  const lipides   = Math.round(caloriesRecommandees * RATIO_LIPIDES_CALORIES / 9);
+  const glucides  = Math.max(0, Math.round((caloriesRecommandees - proteines * 4 - lipides * 9) / 4));
+  return { proteines, glucides, lipides };
+}
+
 // ── Muscles travaillés ───────────────────────────────────────────────────
 // Agrège les muscles ciblés des exercices ayant au moins une série validée,
 // triés par fréquence d'apparition décroissante.

@@ -2,7 +2,7 @@
 import { currentUser }  from '../js/auth.js';
 import { supabase }     from '../js/supabase.js';
 import { showToast, todayStr, formatDate, openModal, confirmDialog } from '../js/utils.js';
-import { calcIMC, imcCategorie, calcMetabolismeBase, calcDepenseTotale, calcCaloriesRecommandees } from '../js/calories.js';
+import { calcIMC, imcCategorie, calcMetabolismeBase, calcDepenseTotale, calcCaloriesRecommandees, calcMacrosRecommandees } from '../js/calories.js';
 import { navigate } from '../js/router.js';
 
 export async function loadNutrition(section) {
@@ -204,8 +204,9 @@ async function renderObjectifs(section) {
 
     const imc  = calcIMC(physique?.poids_kg, physique?.taille_cm);
     const bmr  = calcMetabolismeBase(physique?.poids_kg, physique?.taille_cm, physique?.age, physique?.sexe);
-    const tdee = calcDepenseTotale(bmr, physique?.frequence);
-    const reco = calcCaloriesRecommandees(tdee, physique?.objectif);
+    const tdee   = calcDepenseTotale(bmr, physique?.frequence);
+    const reco   = calcCaloriesRecommandees(tdee, physique?.objectif);
+    const macros = calcMacrosRecommandees(reco, physique?.poids_kg, physique?.objectif);
 
     content.innerHTML = `
       <div class="page-section">
@@ -235,6 +236,8 @@ async function renderObjectifs(section) {
             <div>
               <p class="card-label">Recommandé pour ton objectif</p>
               <p class="card-value" style="color:var(--color-primary)">${reco}<span class="card-unit"> kcal/j</span></p>
+              ${macros ? `<p style="font-size:11px;color:var(--text-muted);margin-top:2px">
+                P ${macros.proteines}g · G ${macros.glucides}g · L ${macros.lipides}g</p>` : ''}
             </div>
             <button class="btn btn-secondary btn-sm" id="btn-apply-reco">Utiliser</button>
           </div>` : ''}
@@ -274,9 +277,17 @@ async function renderObjectifs(section) {
       </div>`;
 
     content.querySelector('#btn-apply-reco')?.addEventListener('click', () => {
-      const inp = content.querySelector('#obj-cal');
-      if (inp) inp.value = reco;
-      showToast('Valeur appliquée — n\'oublie pas d\'enregistrer', 'info');
+      const calInp = content.querySelector('#obj-cal');
+      if (calInp) calInp.value = reco;
+      if (macros) {
+        const protInp = content.querySelector('#obj-prot');
+        const glucInp = content.querySelector('#obj-gluc');
+        const lipInp  = content.querySelector('#obj-lip');
+        if (protInp) protInp.value = macros.proteines;
+        if (glucInp) glucInp.value = macros.glucides;
+        if (lipInp)  lipInp.value  = macros.lipides;
+      }
+      showToast('Valeurs appliquées — n\'oublie pas d\'enregistrer', 'info');
     });
     content.querySelector('#link-profil-metabo')?.addEventListener('click', e => {
       e.preventDefault();
