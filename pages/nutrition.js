@@ -24,7 +24,12 @@ export async function loadNutrition(section) {
     tab.addEventListener('click', () => {
       section.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
       tab.classList.add('active');
-      if (tab.dataset.tab === 'journal') renderJournal(section, todayStr());
+      const isJournal = tab.dataset.tab === 'journal';
+      // Le "+" sert à logger un repas : ça n'a pas de sens sur l'onglet
+      // Objectifs, qui ne liste pas de repas.
+      const fab = section.querySelector('#btn-add-repas');
+      if (fab) fab.classList.toggle('hidden', !isJournal);
+      if (isJournal) renderJournal(section, todayStr());
       else renderObjectifs(section);
     });
   });
