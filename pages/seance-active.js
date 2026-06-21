@@ -222,6 +222,12 @@ function _singleCardHTML(exo, ei) {
           <h3 class="exercise-card-name">${_esc(exo.nom)}</h3>
           ${exo.lastPerf ? `<p class="exercise-card-hint">Dernière fois : ${_esc(exo.lastPerf)}</p>` : ''}
         </div>
+        <button class="icon-btn" data-action="replace-exo" data-exo="${ei}" aria-label="Remplacer l'exercice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+            <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+          </svg>
+        </button>
         <button class="icon-btn" data-action="remove-exo" data-exo="${ei}" aria-label="Supprimer">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -284,7 +290,19 @@ function _supersetCardHTML(indices) {
       <div class="exercise-card-header">
         <div class="exercise-card-info">
           <h3 class="exercise-card-name">⚡ Superset</h3>
-          <p class="exercise-card-hint">${exos.map(e => _esc(e.nom)).join(' + ')}</p>
+          <div class="exercise-card-hint" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px">
+            ${exos.map((e, idx) => `
+              <span style="display:inline-flex;align-items:center;gap:2px">
+                ${idx > 0 ? '<span>+</span>' : ''}${_esc(e.nom)}
+                <button class="icon-btn" data-action="replace-exo" data-exo="${indices[idx]}"
+                  aria-label="Remplacer l'exercice" style="width:18px;height:18px;padding:0;color:var(--text-muted)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px">
+                    <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                    <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                  </svg>
+                </button>
+              </span>`).join('')}
+          </div>
         </div>
       </div>
 
@@ -338,7 +356,7 @@ function _supersetRoundHTML(indices, exos, r, nCols, widths) {
 
 function _bindEvents() {
   _section.querySelector('#btn-finish-seance')?.addEventListener('click', _confirmFinish);
-  _section.querySelector('#btn-add-exo')?.addEventListener('click', openExercicePicker);
+  _section.querySelector('#btn-add-exo')?.addEventListener('click', () => openExercicePicker());
 
   const cardList = _section.querySelector('#exo-cards-list');
   cardList?.addEventListener('click',  _onCardClick);
@@ -351,6 +369,7 @@ async function _onCardClick(e) {
   const { action, exo, set: setIdx, indices, round } = btn.dataset;
 
   if (action === 'remove-exo')   await _removeExo(parseInt(exo));
+  if (action === 'replace-exo')  await openExercicePicker(parseInt(exo));
   if (action === 'add-serie')    _addSerie(parseInt(exo));
   if (action === 'toggle-done')  await _toggleDone(parseInt(exo), parseInt(setIdx));
   if (action === 'toggle-round') await _toggleRound(indices.split(',').map(Number), parseInt(round));
@@ -385,10 +404,16 @@ async function _lookupExerciceMeta(nom) {
   }
 }
 
-export async function addExercice(nom) {
+export async function addExercice(nom, { superset = false } = {}) {
   const { type_metrique, muscles } = await _lookupExerciceMeta(nom);
   const fields = metricFields(type_metrique);
   const perf   = await _fetchLastPerf(nom, type_metrique);
+
+  // Chaîne ce nouvel exercice avec le précédent : on retire le repos qui
+  // les séparait pour les faire enchaîner sans pause, comme un superset
+  // construit dans le constructeur de routine.
+  const prev = _state.exercices.at(-1);
+  if (superset && prev) prev.repos_inter = null;
 
   _state.exercices.push({
     nom, type_metrique, muscles, repos_inter: APP_CONFIG.defaultRestTime,
@@ -401,6 +426,27 @@ export async function addExercice(nom) {
     const cards = _section.querySelectorAll('.exercise-card');
     cards[cards.length - 1]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 60);
+}
+
+// Remplace un exercice par un autre en conservant sa place dans la séance
+// (et son repos_inter, donc un éventuel chaînage en superset) — utile quand
+// le matériel prévu est pris ou pour varier un mouvement à la dernière minute.
+async function _replaceExercice(ei, nom) {
+  const exo = _state.exercices[ei];
+  if (!exo) return;
+
+  const { type_metrique, muscles } = await _lookupExerciceMeta(nom);
+  const fields = metricFields(type_metrique);
+  const perf   = await _fetchLastPerf(nom, type_metrique);
+
+  _state.exercices[ei] = {
+    nom, type_metrique, muscles, repos_inter: exo.repos_inter,
+    lastPerf: perf?.summary ?? null,
+    sets: [_blankSet(fields, perf)],
+  };
+
+  render();
+  showToast(`Remplacé par "${nom}"`, 'success');
 }
 
 export async function addExercices(noms) {
@@ -492,7 +538,11 @@ async function _toggleDone(ei, si) {
 
   if (!set.done) {
     set.done  = true;
-    set.repos = set.repos ?? APP_CONFIG.defaultRestTime;
+    // La dernière série d'un exercice est suivie du repos prévu avant
+    // l'exercice suivant (repos_inter), pas du repos entre séries de ce
+    // même exercice.
+    const isLastSet = si === exo.sets.length - 1;
+    set.repos = (isLastSet && exo.repos_inter != null) ? exo.repos_inter : (set.repos ?? APP_CONFIG.defaultRestTime);
     _lastActiveExoIndex = ei;
 
     const row = {
@@ -529,6 +579,8 @@ async function _toggleDone(ei, si) {
 // fois, comme on les enchaîne réellement sans repos entre eux).
 async function _toggleRound(indices, r) {
   _lastActiveExoIndex = indices.at(-1);
+  const totalRounds = Math.max(...indices.map(i => _state.exercices[i].sets.length));
+  const isLastRound  = r === totalRounds - 1;
 
   for (const ei of indices) {
     const exo = _state.exercices[ei];
@@ -546,7 +598,11 @@ async function _toggleRound(indices, r) {
     if (!set || set.done) continue;
 
     set.done  = true;
-    set.repos = set.repos ?? APP_CONFIG.defaultRestTime;
+    // Comme pour un exercice seul : le dernier round du superset est suivi
+    // du repos prévu avant le bloc suivant (repos_inter du dernier exercice
+    // du superset), pas du repos habituel entre deux rounds.
+    const useReposInter = isLastRound && ei === indices.at(-1) && exo.repos_inter != null;
+    set.repos = useReposInter ? exo.repos_inter : (set.repos ?? APP_CONFIG.defaultRestTime);
 
     const fields = metricFields(exo.type_metrique);
     const row = {
@@ -609,13 +665,15 @@ async function _fetchLastPerf(nom, type_metrique = DEFAULT_METRIC_TYPE) {
 
 // ── Picker d'exercice ─────────────────────────────────────────────────
 
-export async function openExercicePicker() {
+export async function openExercicePicker(replaceEi = null) {
   const { getAllExercices } = await import('./exercices.js');
   const EXERCICES = await getAllExercices();
   const GROUPES = ['Tous', ...new Set(EXERCICES.map(e => e.groupe))];
+  const lastExoNom = replaceEi == null ? (_state.exercices.at(-1)?.nom ?? null) : null;
 
-  let search = '';
-  let groupe = 'Tous';
+  let search      = '';
+  let groupe      = 'Tous';
+  let supersetOn  = false;
 
   const rerender = () => {
     const filtered = EXERCICES.filter(e => {
@@ -638,14 +696,22 @@ export async function openExercicePicker() {
           </button>`).join('');
 
     list.querySelectorAll('.picker-exo-btn').forEach(btn => {
-      btn.addEventListener('click', () => { closeModal(); addExercice(btn.dataset.nom); });
+      btn.addEventListener('click', () => {
+        closeModal();
+        if (replaceEi != null) _replaceExercice(replaceEi, btn.dataset.nom);
+        else addExercice(btn.dataset.nom, { superset: supersetOn });
+      });
     });
   };
 
   openModal({
-    title: 'Choisir un exercice',
+    title: replaceEi != null ? 'Remplacer l\'exercice' : 'Choisir un exercice',
     body: `
       <div class="picker-wrapper">
+        ${lastExoNom ? `
+        <button class="chip" id="picker-superset-toggle" style="font-weight:700;align-self:flex-start">
+          ⚡ Superset avec "${_esc(lastExoNom)}"
+        </button>` : ''}
         <div class="search-bar" style="margin-bottom:0">
           <div class="search-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -662,6 +728,11 @@ export async function openExercicePicker() {
 
   rerender();
 
+  document.getElementById('picker-superset-toggle')?.addEventListener('click', () => {
+    supersetOn = !supersetOn;
+    document.getElementById('picker-superset-toggle')?.classList.toggle('active', supersetOn);
+  });
+
   document.getElementById('picker-search')?.addEventListener('input', e => {
     search = e.target.value.toLowerCase().trim();
     rerender();
@@ -675,7 +746,10 @@ export async function openExercicePicker() {
       document.getElementById('picker-custom')?.addEventListener('click', async () => {
         closeModal();
         const { openCreateExerciceModal } = await import('./exercices.js');
-        openCreateExerciceModal(raw, (newExo) => addExercice(newExo.nom));
+        openCreateExerciceModal(raw, (newExo) => {
+          if (replaceEi != null) _replaceExercice(replaceEi, newExo.nom);
+          else addExercice(newExo.nom, { superset: supersetOn });
+        });
       });
     }
   });

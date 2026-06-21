@@ -154,6 +154,12 @@ function _exoHTML(ex, i) {
           </svg>
         </div>
         <p style="flex:1;font-weight:700;font-size:.95rem">${_esc(ex.nom)}</p>
+        <button class="rb-replace-exo icon-btn" data-uid="${ex.uid}" aria-label="Remplacer l'exercice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+            <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+          </svg>
+        </button>
         <button class="rb-del-exo icon-btn" data-uid="${ex.uid}" style="color:var(--color-error)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
@@ -248,6 +254,13 @@ function _bindEvents() {
       _syncDOM();
       _state.exercices = _state.exercices.filter(x => x.uid !== de.dataset.uid);
       _renderList();
+      return;
+    }
+
+    const re = e.target.closest('.rb-replace-exo');
+    if (re) {
+      _syncDOM();
+      _pickExo(re.dataset.uid);
       return;
     }
 
@@ -394,7 +407,18 @@ function _reposPopup(anchor, current, onConfirm, isInter = false) {
 
 // ── Picker d'exercice ──────────────────────────────────────────────────
 
-async function _pickExo() {
+function _replaceExo(uid, nom, type_metrique) {
+  const ex = _findExo(uid);
+  if (!ex) return;
+  const newType = type_metrique || DEFAULT_METRIC_TYPE;
+  ex.nom = nom;
+  ex.type_metrique = newType;
+  // Garde le nombre de séries et les repos déjà réglés (et la place dans le
+  // superset le cas échéant) — seuls le nom et les champs de saisie changent.
+  ex.series = ex.series.map(s => _normalizeSerie({ uid: s.uid, repos: s.repos, fait: false }, newType));
+}
+
+async function _pickExo(replaceUid = null) {
   const EXERCICES = await getAllExercices();
   const GROUPES   = ['Tous', ...new Set(EXERCICES.map(e => e.groupe).filter(Boolean))];
   let search = '', groupe = 'Tous';
@@ -419,7 +443,7 @@ async function _pickExo() {
 
       <div style="display:flex;align-items:center;justify-content:space-between;
         padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
-        <h3 style="font-weight:700">Ajouter un exercice</h3>
+        <h3 style="font-weight:700">${replaceUid ? 'Remplacer l\'exercice' : 'Ajouter un exercice'}</h3>
         <button id="rp-close" class="icon-btn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -460,7 +484,8 @@ async function _pickExo() {
   const pick = nom => {
     _syncDOM();
     const def = EXERCICES.find(e => e.nom === nom);
-    _state.exercices.push(_normalizeExo({ nom, type_metrique: def?.type_metrique }));
+    if (replaceUid) _replaceExo(replaceUid, nom, def?.type_metrique);
+    else _state.exercices.push(_normalizeExo({ nom, type_metrique: def?.type_metrique }));
     close();
     _renderList();
   };
@@ -473,7 +498,8 @@ async function _pickExo() {
     close();
     openCreateExerciceModal(raw, (newExo) => {
       _syncDOM();
-      _state.exercices.push(_normalizeExo({ nom: newExo.nom, type_metrique: newExo.type_metrique }));
+      if (replaceUid) _replaceExo(replaceUid, newExo.nom, newExo.type_metrique);
+      else _state.exercices.push(_normalizeExo({ nom: newExo.nom, type_metrique: newExo.type_metrique }));
       _renderList();
     });
   };

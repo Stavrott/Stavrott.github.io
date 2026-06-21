@@ -42,9 +42,10 @@ async function renderJournal(section, date) {
   content.innerHTML = skeletonNutri();
 
   try {
-    const [{ data: repas }, { data: objectifs }] = await Promise.all([
+    const [{ data: repas }, { data: objectifs }, { data: seancesJour }] = await Promise.all([
       supabase.from('nutrition').select('*').eq('user_id', currentUser.id).eq('date', date).order('created_at'),
       supabase.from('objectifs_nutrition').select('*').eq('user_id', currentUser.id).maybeSingle(),
+      supabase.from('seances').select('calories_estimees').eq('user_id', currentUser.id).eq('date', date),
     ]);
 
     const obj = objectifs || { calories: 2000, proteines: 150, glucides: 200, lipides: 70 };
@@ -55,6 +56,9 @@ async function renderJournal(section, date) {
       acc.lipides   += r.lipides   || 0;
       return acc;
     }, { calories: 0, proteines: 0, glucides: 0, lipides: 0 });
+
+    const caloriesBrulees = (seancesJour ?? []).reduce((s, x) => s + (x.calories_estimees || 0), 0);
+    const bilan = totaux.calories - caloriesBrulees;
 
     const pct = (v, max) => Math.min(Math.round((v / max) * 100), 100);
 
@@ -101,6 +105,27 @@ async function renderJournal(section, date) {
             <div class="progress-fill" style="background:#ef4444;width:${pct(totaux.lipides, obj.lipides)}%"></div>
           </div>
           <p style="font-size:10px;color:var(--text-muted);margin-top:4px">/ ${obj.lipides}g</p>
+        </div>
+      </div>
+
+      <!-- Bilan ingérées / brûlées -->
+      <div class="card page-section">
+        <p class="card-title" style="margin-bottom:var(--space-3)">Bilan calorique du jour</p>
+        <div style="display:flex;align-items:center;justify-content:space-around;text-align:center;gap:var(--space-2)">
+          <div>
+            <p style="font-size:var(--font-size-2xl);font-weight:800;color:var(--color-primary)">${totaux.calories}</p>
+            <p style="font-size:var(--font-size-xs);color:var(--text-muted)">Ingérées</p>
+          </div>
+          <span style="font-size:var(--font-size-xl);color:var(--text-muted)">−</span>
+          <div>
+            <p style="font-size:var(--font-size-2xl);font-weight:800;color:var(--color-success)">${caloriesBrulees}</p>
+            <p style="font-size:var(--font-size-xs);color:var(--text-muted)">Brûlées (séances)</p>
+          </div>
+          <span style="font-size:var(--font-size-xl);color:var(--text-muted)">=</span>
+          <div>
+            <p style="font-size:var(--font-size-2xl);font-weight:800;color:${bilan > 0 ? 'var(--color-warning)' : 'var(--color-success)'}">${bilan > 0 ? '+' : ''}${bilan}</p>
+            <p style="font-size:var(--font-size-xs);color:var(--text-muted)">Bilan</p>
+          </div>
         </div>
       </div>
 

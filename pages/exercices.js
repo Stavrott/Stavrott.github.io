@@ -8,6 +8,23 @@ import { METRIC_TYPES, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
 // ── Bibliothèque intégrée ─────────────────────────────────────────────
 
 export const EXERCICES = [
+  // ── Échauffement ──────────────────────────────────────────────────────
+  { nom: 'Rotation externe d\'épaule à la poulie (coude au corps)', groupe: 'Échauffement', materiel: 'Câble', niveau: 'Débutant',
+    muscles: ['Coiffe des rotateurs', 'Deltoïdes postérieurs'],
+    description: 'Poulie basse, coude plié à 90° et collé au corps. Éloignez l\'avant-bras du corps en gardant le coude fixe, puis revenez lentement. Échauffement classique de la coiffe des rotateurs.' },
+  { nom: 'Rotation interne d\'épaule à la poulie (coude au corps)', groupe: 'Échauffement', materiel: 'Câble', niveau: 'Débutant',
+    muscles: ['Coiffe des rotateurs', 'Pectoraux'],
+    description: 'Poulie réglée à l\'opposé, coude plié à 90° et collé au corps. Ramenez l\'avant-bras vers le ventre en gardant le coude fixe, puis revenez lentement.' },
+  { nom: 'Rotation interne d\'épaule à la poulie (bras à 90°)', groupe: 'Échauffement', materiel: 'Câble', niveau: 'Débutant',
+    muscles: ['Coiffe des rotateurs', 'Deltoïdes'],
+    description: 'Coude levé à hauteur d\'épaule, avant-bras perpendiculaire au sol (poing vers le haut). Abaissez l\'avant-bras jusqu\'à l\'horizontale en pivotant à l\'épaule, puis remontez.' },
+  { nom: 'Rotation externe d\'épaule à la poulie (bras à 90°)', groupe: 'Échauffement', materiel: 'Câble', niveau: 'Débutant',
+    muscles: ['Coiffe des rotateurs', 'Deltoïdes postérieurs'],
+    description: 'Coude levé à hauteur d\'épaule, avant-bras à l\'horizontale. Montez l\'avant-bras à la verticale en pivotant à l\'épaule, puis redescendez lentement.' },
+  { nom: 'Élévation des bras tendus haltères', groupe: 'Échauffement', materiel: 'Haltères', niveau: 'Débutant',
+    muscles: ['Deltoïdes', 'Trapèzes'],
+    description: 'Bras tendus le long du corps, haltères légers en main. Montez les bras tendus jusqu\'au-dessus de la tête, puis redescendez avec contrôle. Échauffement global de l\'épaule.' },
+
   // ── Poitrine ──────────────────────────────────────────────────────────
   { nom: 'Développé couché', groupe: 'Poitrine', materiel: 'Barre', niveau: 'Intermédiaire',
     muscles: ['Pectoraux', 'Triceps', 'Deltoïdes antérieurs'],
@@ -438,6 +455,13 @@ async function _renderMes() {
       _deleteCustom(btn.dataset.deleteExo);
     });
   });
+  list.querySelectorAll('[data-edit-exo]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const exo = custom.find(c => String(c.id) === btn.dataset.editExo);
+      if (exo) openCreateExerciceModal('', null, exo);
+    });
+  });
 }
 
 // ── HTML item exercice ────────────────────────────────────────────────
@@ -466,11 +490,18 @@ function _exoItem(e, i, list, showDelete = false) {
         </div>
       </div>
       ${showDelete
-        ? `<button class="icon-btn" data-delete-exo="${e.id}" style="color:var(--color-error);flex-shrink:0">
-             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-               <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
-             </svg>
-           </button>`
+        ? `<div style="display:flex;gap:4px;flex-shrink:0">
+             <button class="icon-btn" data-edit-exo="${e.id}" style="flex-shrink:0">
+               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                 <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+               </svg>
+             </button>
+             <button class="icon-btn" data-delete-exo="${e.id}" style="color:var(--color-error);flex-shrink:0">
+               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                 <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
+               </svg>
+             </button>
+           </div>`
         : `<span class="badge badge-muted" style="flex-shrink:0">${e.niveau ?? ''}</span>`
       }
     </div>`;
@@ -685,59 +716,60 @@ function _esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 }
 
-export function openCreateExerciceModal(prefillNom = '', onCreated = null) {
+export function openCreateExerciceModal(prefillNom = '', onCreated = null, editExo = null) {
   const GROUPES_ALL = [...GROUPES_BASE, 'Cardio', 'Mobilité', 'Autre'];
+  const typeMetriqueVal = editExo?.type_metrique || DEFAULT_METRIC_TYPE;
 
   openModal({
-    title: 'Nouvel exercice',
+    title: editExo ? 'Modifier l\'exercice' : 'Nouvel exercice',
     body: `
       <div style="display:flex;flex-direction:column;gap:var(--space-4)">
         <div class="form-group">
           <label class="form-label">Nom de l'exercice *</label>
-          <input class="form-input" id="ce-nom" type="text" placeholder="ex: Curl marteau unilatéral" autocomplete="off" value="${_esc(prefillNom)}">
+          <input class="form-input" id="ce-nom" type="text" placeholder="ex: Curl marteau unilatéral" autocomplete="off" value="${_esc(editExo?.nom ?? prefillNom)}">
         </div>
         <div class="form-group">
           <label class="form-label">Groupe musculaire *</label>
           <select class="form-select" id="ce-groupe">
-            ${GROUPES_ALL.map(g => `<option value="${g}">${g}</option>`).join('')}
+            ${GROUPES_ALL.map(g => `<option value="${g}" ${g === editExo?.groupe ? 'selected' : ''}>${g}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Matériel</label>
-          <input class="form-input" id="ce-materiel" type="text" placeholder="ex: Haltères, Câble, Machine…" value="Aucun">
+          <input class="form-input" id="ce-materiel" type="text" placeholder="ex: Haltères, Câble, Machine…" value="${_esc(editExo?.materiel ?? 'Aucun')}">
         </div>
         <div class="form-group">
           <label class="form-label">Type de saisie *</label>
           <select class="form-select" id="ce-type-metrique">
             ${Object.entries(METRIC_TYPES).map(([key, t]) =>
-              `<option value="${key}" ${key === DEFAULT_METRIC_TYPE ? 'selected' : ''}>${t.label}</option>`).join('')}
+              `<option value="${key}" ${key === typeMetriqueVal ? 'selected' : ''}>${t.label}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Muscles ciblés</label>
-          ${_muscleTagPickerHTML()}
+          ${_muscleTagPickerHTML(editExo?.muscles ?? [])}
         </div>
         <div class="form-group">
           <label class="form-label">Description (facultatif)</label>
-          <textarea class="form-input form-textarea" id="ce-desc" rows="3" placeholder="Consignes techniques…"></textarea>
+          <textarea class="form-input form-textarea" id="ce-desc" rows="3" placeholder="Consignes techniques…">${_esc(editExo?.description ?? '')}</textarea>
         </div>
       </div>`,
     footer: `
       <button class="btn btn-secondary" id="ce-cancel">Annuler</button>
-      <button class="btn btn-primary" id="ce-save" style="flex:1">Créer l'exercice</button>`,
+      <button class="btn btn-primary" id="ce-save" style="flex:1">${editExo ? 'Enregistrer' : 'Créer l\'exercice'}</button>`,
   });
 
   setTimeout(() => { const i = document.getElementById('ce-nom'); if (i) { i.focus(); if (prefillNom) i.select(); } }, 80);
   _bindMuscleTagPicker();
   document.getElementById('ce-cancel')?.addEventListener('click', closeModal);
-  document.getElementById('ce-save')?.addEventListener('click', () => _saveCustom(onCreated));
+  document.getElementById('ce-save')?.addEventListener('click', () => _saveCustom(onCreated, editExo));
 }
 
 function _openCreateModal() {
   openCreateExerciceModal();
 }
 
-async function _saveCustom(onCreated) {
+async function _saveCustom(onCreated, editExo = null) {
   const nom      = document.getElementById('ce-nom')?.value.trim();
   const groupe   = document.getElementById('ce-groupe')?.value;
   const materiel = document.getElementById('ce-materiel')?.value.trim() || 'Aucun';
@@ -749,14 +781,18 @@ async function _saveCustom(onCreated) {
 
   showLoading();
   try {
-    const { data, error } = await supabase.from('exercices_custom').insert({
-      user_id: currentUser.id, nom, groupe, materiel, muscles, description: desc || null,
+    const payload = {
+      nom, groupe, materiel, muscles, description: desc || null,
       type_metrique: typeMetrique,
-    }).select().single();
+    };
+
+    const { data, error } = editExo
+      ? await supabase.from('exercices_custom').update(payload).eq('id', editExo.id).select().single()
+      : await supabase.from('exercices_custom').insert({ ...payload, user_id: currentUser.id }).select().single();
     if (error) throw error;
     _customCache = null;
     closeModal();
-    showToast(`"${nom}" ajouté à vos exercices`, 'success');
+    showToast(editExo ? `"${nom}" mis à jour` : `"${nom}" ajouté à vos exercices`, 'success');
     if (onCreated) {
       onCreated({ ...data, custom: true });
     } else {
@@ -764,7 +800,7 @@ async function _saveCustom(onCreated) {
       _section?.querySelector('[data-tab="mes"]')?.click();
     }
   } catch {
-    showToast('Erreur lors de la création', 'error');
+    showToast(editExo ? 'Erreur lors de la modification' : 'Erreur lors de la création', 'error');
   } finally {
     hideLoading();
   }
