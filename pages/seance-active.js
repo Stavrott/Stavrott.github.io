@@ -388,12 +388,16 @@ function _supersetCardHTML(indices, blockIdx, totalBlocks) {
         </div>
         <div class="exercise-card-info">
           <h3 class="exercise-card-name">⚡ Superset</h3>
-          <div class="exercise-card-hint" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px">
+          <div class="exercise-card-hint" style="display:flex;flex-direction:column;gap:4px;margin-top:2px">
             ${exos.map((e, idx) => `
-              <span style="display:inline-flex;align-items:center;gap:2px">
-                ${idx > 0 ? '<span>+</span>' : ''}
+              <span style="display:inline-flex;align-items:center;gap:6px">
+                ${idx > 0 ? '<span style="font-size:10px;color:var(--text-muted);padding-left:2px">+</span>' : ''}
+                <span class="exo-thumb" data-img-nom="${_esc(e.nom)}"
+                  style="width:28px;height:28px;min-width:28px;border-radius:6px;overflow:hidden;
+                    background:var(--surface-3);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">
+                </span>
                 <button data-action="show-exo-detail" data-exo="${indices[idx]}"
-                  style="background:none;border:none;padding:0;cursor:pointer;font-size:inherit;color:inherit;font-weight:600">${_esc(e.nom)}</button>
+                  style="background:none;border:none;padding:0;cursor:pointer;font-size:inherit;color:inherit;font-weight:600;text-align:left">${_esc(e.nom)}</button>
                 <button class="icon-btn" data-action="replace-exo" data-exo="${indices[idx]}"
                   aria-label="Remplacer l'exercice" style="width:18px;height:18px;padding:0;color:var(--text-muted)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px">
