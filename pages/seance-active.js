@@ -18,6 +18,8 @@ let _startTime  = null;
 let _elapsedId  = null;
 let _lastActiveExoIndex = null; // dernier exercice dont une série a été validée — sert à déterminer "en cours" / "prochain" pour la barre flottante
 
+const _setTimers = new Map(); // timers actifs par série, clé `${ei}_${si}`
+
 const _uid = () => Math.random().toString(36).slice(2, 10);
 const _esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
@@ -168,6 +170,7 @@ function _colWidths(fields) {
 // ── Rendu principal ───────────────────────────────────────────────────
 
 function render() {
+  _clearAllTimers();
   if (!_section || !_state) return;
 
   const exoCount = _state.exercices.length;
@@ -191,7 +194,12 @@ function render() {
     <h2 class="seance-active-title">${_state.seance.nom}</h2>
 
     <div id="exo-cards-list">
-      ${blocks.map(b => b.type === 'single' ? _singleCardHTML(_state.exercices[b.index], b.index) : _supersetCardHTML(b.indices)).join('')}
+      ${blocks.map((b, bi) =>
+        (b.type === 'single'
+          ? _singleCardHTML(_state.exercices[b.index], b.index, bi, blocks.length)
+          : _supersetCardHTML(b.indices, bi, blocks.length))
+        + (bi < blocks.length - 1 ? _interBlockSepHTML(b) : '')
+      ).join('')}
     </div>
 
     <button class="btn-add-exo" id="btn-add-exo">
@@ -210,16 +218,35 @@ function _statsLabel(exoCount, setsDone) {
 
 // ── HTML carte exercice simple ─────────────────────────────────────────
 
-function _singleCardHTML(exo, ei) {
+const _SVG_UP   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>`;
+const _SVG_DOWN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+const _SVG_DEL  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+const _SVG_TIMER= `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+const _SVG_STOP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
+
+function _singleCardHTML(exo, ei, blockIdx, totalBlocks) {
   const fields   = metricFields(exo.type_metrique);
   const showPrev = (exo.type_metrique || DEFAULT_METRIC_TYPE) === 'kg_reps';
+  const hasDuree = fields.some(f => f.key === 'duree');
   const widths   = _colWidths(fields);
+  const isFirst  = blockIdx === 0;
+  const isLast   = blockIdx === totalBlocks - 1;
 
   return `
     <div class="exercise-card" data-exo-index="${ei}">
       <div class="exercise-card-header">
+        <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0">
+          <button class="icon-btn" data-action="move-block" data-exo="${ei}" data-dir="-1"
+            style="width:22px;height:22px${isFirst ? ';opacity:.25;pointer-events:none' : ''}">
+            ${_SVG_UP}
+          </button>
+          <button class="icon-btn" data-action="move-block" data-exo="${ei}" data-dir="1"
+            style="width:22px;height:22px${isLast ? ';opacity:.25;pointer-events:none' : ''}">
+            ${_SVG_DOWN}
+          </button>
+        </div>
         <div class="exercise-card-info">
-          <h3 class="exercise-card-name">${_esc(exo.nom)}</h3>
+          <h3 class="exercise-card-name" style="cursor:pointer" data-action="show-exo-detail" data-exo="${ei}">${_esc(exo.nom)}</h3>
           ${exo.lastPerf ? `<p class="exercise-card-hint">Dernière fois : ${_esc(exo.lastPerf)}</p>` : ''}
         </div>
         <button class="icon-btn" data-action="replace-exo" data-exo="${ei}" aria-label="Remplacer l'exercice">
@@ -229,15 +256,18 @@ function _singleCardHTML(exo, ei) {
           </svg>
         </button>
         <button class="icon-btn" data-action="remove-exo" data-exo="${ei}" aria-label="Supprimer">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          ${_SVG_DEL}
         </button>
       </div>
 
       <div class="sets-header-row">
+        <span style="width:20px;flex-shrink:0"></span>
         <span class="col-num">#</span>
         <span class="col-prev">${showPrev ? 'Précédent' : ''}</span>
         ${fields.map((f, i) => `<span class="col-field" style="width:${widths[i]}px">${f.header}</span>`).join('')}
+        ${hasDuree ? `<span style="width:28px;flex-shrink:0"></span>` : ''}
         <span class="col-done"></span>
+        <span style="width:22px;flex-shrink:0"></span>
       </div>
 
       <div class="sets-list" data-exo-sets="${ei}">
@@ -255,45 +285,97 @@ function _setRowHTML(exo, set, ei, si) {
   const done     = set.done;
   const fields   = metricFields(exo.type_metrique);
   const showPrev = (exo.type_metrique || DEFAULT_METRIC_TYPE) === 'kg_reps';
+  const hasDuree = fields.some(f => f.key === 'duree');
   const widths   = _colWidths(fields);
+  const isFirst  = si === 0;
+  const isLast   = si === exo.sets.length - 1;
   const prev = done
     ? (showPrev && set.poids != null ? `${set.poids} × ${set.reps ?? '?'}` : '')
     : (showPrev ? (exo.lastPerf ?? '—') : '');
 
   return `
     <div class="set-row ${done ? 'set-done' : ''}" data-exo="${ei}" data-set="${si}">
+      <div style="display:flex;flex-direction:column;gap:0;flex-shrink:0">
+        <button class="icon-btn" data-action="move-serie" data-exo="${ei}" data-set="${si}" data-dir="-1"
+          style="width:18px;height:18px;padding:0;color:var(--text-muted)${isFirst ? ';opacity:.2;pointer-events:none' : ''}">
+          ${_SVG_UP}
+        </button>
+        <button class="icon-btn" data-action="move-serie" data-exo="${ei}" data-set="${si}" data-dir="1"
+          style="width:18px;height:18px;padding:0;color:var(--text-muted)${isLast ? ';opacity:.2;pointer-events:none' : ''}">
+          ${_SVG_DOWN}
+        </button>
+      </div>
       <div class="set-num ${done ? 'set-num-done' : ''}">${si + 1}</div>
-      <div class="set-prev">${_esc(prev)}</div>
+      <div class="set-prev" id="setprev-${ei}-${si}">${_esc(prev)}</div>
       ${fields.map((f, i) => `
-        <input class="set-input" type="number" inputmode="${f.type === 'int' ? 'numeric' : 'decimal'}" step="${f.step}" min="0"
+        <input class="set-input${done ? ' set-input-done' : ''}" type="number" inputmode="${f.type === 'int' ? 'numeric' : 'decimal'}" step="${f.step}" min="0"
           placeholder="0" value="${set[f.key] ?? ''}" style="width:${widths[i]}px"
-          data-field="${f.key}" data-exo="${ei}" data-set="${si}" ${done ? 'disabled' : ''}>`).join('')}
+          data-field="${f.key}" data-exo="${ei}" data-set="${si}">`).join('')}
+      ${hasDuree ? `
+        <button class="icon-btn" data-action="toggle-timer" data-exo="${ei}" data-set="${si}"
+          id="tmrbtn-${ei}-${si}" style="width:28px;height:28px;flex-shrink:0;color:var(--text-muted)">
+          ${_SVG_TIMER}
+        </button>` : ''}
       <button class="set-check ${done ? 'set-check-done' : ''}"
         data-action="toggle-done" data-exo="${ei}" data-set="${si}"
         aria-label="Valider la série">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </button>
+      <button class="icon-btn" data-action="remove-serie" data-exo="${ei}" data-set="${si}"
+        style="width:22px;height:22px;flex-shrink:0;color:var(--text-muted)">
+        ${_SVG_DEL}
+      </button>
+    </div>`;
+}
+
+// ── HTML séparateur inter-blocs ─────────────────────────────────────────
+
+function _interBlockSepHTML(block) {
+  const lastIdx = block.type === 'single' ? block.index : block.indices.at(-1);
+  return `
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0 8px;padding:0 4px">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <button class="chip" data-action="make-superset" data-exo="${lastIdx}"
+        style="font-size:11px;font-weight:700;padding:3px 10px;border-color:var(--color-primary);color:var(--color-primary)">
+        ⚡ Superset
+      </button>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
     </div>`;
 }
 
 // ── HTML carte superset ─────────────────────────────────────────────────
 
-function _supersetCardHTML(indices) {
-  const exos     = indices.map(i => _state.exercices[i]);
-  const rounds   = Math.max(...exos.map(ex => ex.sets.length));
-  const sameType = exos.every(ex => ex.type_metrique === exos[0].type_metrique);
-  const nCols    = Math.max(...exos.map(ex => metricFields(ex.type_metrique).length));
-  const widths   = Array.from({ length: nCols }, (_, i) => (i === 0 ? 72 : 60));
+function _supersetCardHTML(indices, blockIdx, totalBlocks) {
+  const exos      = indices.map(i => _state.exercices[i]);
+  const rounds    = Math.max(...exos.map(ex => ex.sets.length));
+  const sameType  = exos.every(ex => ex.type_metrique === exos[0].type_metrique);
+  const nCols     = Math.max(...exos.map(ex => metricFields(ex.type_metrique).length));
+  const widths    = Array.from({ length: nCols }, (_, i) => (i === 0 ? 72 : 60));
+  const hasDuree  = exos.some(ex => metricFields(ex.type_metrique).some(f => f.key === 'duree'));
+  const isFirst   = blockIdx === 0;
+  const isLast    = blockIdx === totalBlocks - 1;
 
   return `
     <div class="exercise-card" data-superset="${indices.join(',')}">
       <div class="exercise-card-header">
+        <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0">
+          <button class="icon-btn" data-action="move-block" data-exo="${indices[0]}" data-dir="-1"
+            style="width:22px;height:22px${isFirst ? ';opacity:.25;pointer-events:none' : ''}">
+            ${_SVG_UP}
+          </button>
+          <button class="icon-btn" data-action="move-block" data-exo="${indices[0]}" data-dir="1"
+            style="width:22px;height:22px${isLast ? ';opacity:.25;pointer-events:none' : ''}">
+            ${_SVG_DOWN}
+          </button>
+        </div>
         <div class="exercise-card-info">
           <h3 class="exercise-card-name">⚡ Superset</h3>
           <div class="exercise-card-hint" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px">
             ${exos.map((e, idx) => `
               <span style="display:inline-flex;align-items:center;gap:2px">
-                ${idx > 0 ? '<span>+</span>' : ''}${_esc(e.nom)}
+                ${idx > 0 ? '<span>+</span>' : ''}
+                <button data-action="show-exo-detail" data-exo="${indices[idx]}"
+                  style="background:none;border:none;padding:0;cursor:pointer;font-size:inherit;color:inherit;font-weight:600">${_esc(e.nom)}</button>
                 <button class="icon-btn" data-action="replace-exo" data-exo="${indices[idx]}"
                   aria-label="Remplacer l'exercice" style="width:18px;height:18px;padding:0;color:var(--text-muted)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px">
@@ -304,50 +386,92 @@ function _supersetCardHTML(indices) {
               </span>`).join('')}
           </div>
         </div>
+        <button class="chip" data-action="break-superset" data-exo="${indices[0]}"
+          style="font-size:11px;padding:2px 8px;background:transparent;border-color:var(--border);color:var(--text-muted);flex-shrink:0">
+          Retirer
+        </button>
       </div>
 
       <div class="sets-header-row">
+        <span style="width:20px;flex-shrink:0"></span>
         <span class="col-num">#</span>
         <span class="col-prev">Exercice</span>
         ${sameType
           ? metricFields(exos[0].type_metrique).map((f, i) => `<span class="col-field" style="width:${widths[i]}px">${f.header}</span>`).join('')
           : widths.map(w => `<span class="col-field" style="width:${w}px"></span>`).join('')}
+        ${hasDuree ? `<span style="width:28px;flex-shrink:0"></span>` : ''}
         <span class="col-done"></span>
+        <span style="width:22px;flex-shrink:0"></span>
       </div>
 
       <div class="sets-list">
-        ${Array.from({ length: rounds }, (_, r) => _supersetRoundHTML(indices, exos, r, nCols, widths)).join('')}
+        ${Array.from({ length: rounds }, (_, r) => _supersetRoundHTML(indices, exos, r, nCols, widths, hasDuree)).join('')}
       </div>
+
+      <button class="btn-add-serie" data-action="add-serie" data-exo="${indices[0]}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="width:13px;height:13px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Ajouter un round
+      </button>
     </div>`;
 }
 
-function _supersetRoundHTML(indices, exos, r, nCols, widths) {
+function _supersetRoundHTML(indices, exos, r, nCols, widths, blockHasDuree) {
+  const maxSets     = Math.max(...exos.map(ex => ex.sets.length));
+  const isFirstRound = r === 0;
+  const isLastRound  = r === maxSets - 1;
+
   return exos.map((ex, idx) => {
-    const ei = indices[idx];
-    const s  = ex.sets[r];
+    const ei         = indices[idx];
+    const s          = ex.sets[r];
     if (!s) return '';
-    const isLast  = idx === exos.length - 1;
-    const fields  = metricFields(ex.type_metrique);
+    const isFirstExo = idx === 0;
+    const isLastExo  = idx === exos.length - 1;
+    const fields     = metricFields(ex.type_metrique);
+    const exHasDuree = fields.some(f => f.key === 'duree');
 
     const inputs = fields.map((f, i) => `
-        <input class="set-input" type="number" inputmode="${f.type === 'int' ? 'numeric' : 'decimal'}" step="${f.step}" min="0"
+        <input class="set-input${s.done ? ' set-input-done' : ''}" type="number" inputmode="${f.type === 'int' ? 'numeric' : 'decimal'}" step="${f.step}" min="0"
           placeholder="0" value="${s[f.key] ?? ''}" style="width:${widths[i]}px"
-          data-field="${f.key}" data-exo="${ei}" data-set="${r}" ${s.done ? 'disabled' : ''}>`).join('')
+          data-field="${f.key}" data-exo="${ei}" data-set="${r}">`).join('')
       + Array.from({ length: Math.max(0, nCols - fields.length) }, (_, i) =>
           `<span style="width:${widths[fields.length + i]}px;flex-shrink:0"></span>`).join('');
 
     return `
       <div class="set-row ${s.done ? 'set-done' : ''}" data-exo="${ei}" data-set="${r}">
+        ${isFirstExo ? `
+          <div style="display:flex;flex-direction:column;gap:0;flex-shrink:0">
+            <button class="icon-btn" data-action="move-round" data-indices="${indices.join(',')}" data-round="${r}" data-dir="-1"
+              style="width:18px;height:18px;padding:0;color:var(--text-muted)${isFirstRound ? ';opacity:.2;pointer-events:none' : ''}">
+              ${_SVG_UP}
+            </button>
+            <button class="icon-btn" data-action="move-round" data-indices="${indices.join(',')}" data-round="${r}" data-dir="1"
+              style="width:18px;height:18px;padding:0;color:var(--text-muted)${isLastRound ? ';opacity:.2;pointer-events:none' : ''}">
+              ${_SVG_DOWN}
+            </button>
+          </div>` : `<span style="width:20px;flex-shrink:0"></span>`}
         <div class="set-num ${s.done ? 'set-num-done' : ''}">${r + 1}</div>
-        <div class="set-prev">${_esc(ex.nom)}</div>
+        <div class="set-prev" id="setprev-${ei}-${r}">${_esc(ex.nom)}</div>
         ${inputs}
-        ${isLast
+        ${blockHasDuree
+          ? (exHasDuree
+            ? `<button class="icon-btn" data-action="toggle-timer" data-exo="${ei}" data-set="${r}"
+                id="tmrbtn-${ei}-${r}" style="width:28px;height:28px;flex-shrink:0;color:var(--text-muted)">
+                ${_SVG_TIMER}
+              </button>`
+            : `<span style="width:28px;flex-shrink:0"></span>`)
+          : ''}
+        ${isLastExo
           ? `<button class="set-check ${s.done ? 'set-check-done' : ''}" ${s.done ? 'disabled' : ''}
               data-action="toggle-round" data-indices="${indices.join(',')}" data-round="${r}"
               aria-label="Valider le round">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+            <button class="icon-btn" data-action="remove-round" data-indices="${indices.join(',')}" data-round="${r}"
+              style="width:22px;height:22px;flex-shrink:0;color:var(--text-muted)">
+              ${_SVG_DEL}
             </button>`
-          : `<span style="width:36px;flex-shrink:0"></span>`}
+          : `<span style="width:36px;flex-shrink:0"></span>
+             <span style="width:22px;flex-shrink:0"></span>`}
       </div>`;
   }).join('');
 }
@@ -359,20 +483,30 @@ function _bindEvents() {
   _section.querySelector('#btn-add-exo')?.addEventListener('click', () => openExercicePicker());
 
   const cardList = _section.querySelector('#exo-cards-list');
-  cardList?.addEventListener('click',  _onCardClick);
-  cardList?.addEventListener('input',  _onInputChange);
+  cardList?.addEventListener('click',    _onCardClick);
+  cardList?.addEventListener('input',    _onInputChange);
+  cardList?.addEventListener('focusout', _onInputBlur);
 }
 
 async function _onCardClick(e) {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
-  const { action, exo, set: setIdx, indices, round } = btn.dataset;
+  const { action, exo, set: setIdx, indices, round, dir } = btn.dataset;
 
-  if (action === 'remove-exo')   await _removeExo(parseInt(exo));
-  if (action === 'replace-exo')  await openExercicePicker(parseInt(exo));
-  if (action === 'add-serie')    _addSerie(parseInt(exo));
-  if (action === 'toggle-done')  await _toggleDone(parseInt(exo), parseInt(setIdx));
-  if (action === 'toggle-round') await _toggleRound(indices.split(',').map(Number), parseInt(round));
+  if (action === 'remove-exo')     await _removeExo(parseInt(exo));
+  if (action === 'replace-exo')    await openExercicePicker(parseInt(exo));
+  if (action === 'add-serie')      _addSerie(parseInt(exo));
+  if (action === 'toggle-done')    await _toggleDone(parseInt(exo), parseInt(setIdx));
+  if (action === 'toggle-round')   await _toggleRound(indices.split(',').map(Number), parseInt(round));
+  if (action === 'move-block')     _moveBlock(parseInt(exo), parseInt(dir));
+  if (action === 'move-serie')     _moveSerie(parseInt(exo), parseInt(setIdx), parseInt(dir));
+  if (action === 'move-round')     _moveRound(indices.split(',').map(Number), parseInt(round), parseInt(dir));
+  if (action === 'remove-serie')   await _removeSerie(parseInt(exo), parseInt(setIdx));
+  if (action === 'remove-round')   await _removeRound(indices.split(',').map(Number), parseInt(round));
+  if (action === 'toggle-timer')   _toggleTimer(parseInt(exo), parseInt(setIdx));
+  if (action === 'make-superset')  _makeSuperset(parseInt(exo));
+  if (action === 'break-superset') _breakSuperset(parseInt(exo));
+  if (action === 'show-exo-detail') await _showExoDetail(parseInt(exo));
 }
 
 function _onInputChange(e) {
@@ -522,17 +656,205 @@ async function _removeExo(ei) {
 }
 
 function _addSerie(ei) {
-  const exo    = _state.exercices[ei];
-  const fields = metricFields(exo.type_metrique);
-  const lastSet = exo.sets.at(-1);
-  const newSet  = { repos: null, done: false, dbId: null };
-  fields.forEach(f => { newSet[f.key] = lastSet?.[f.key] ?? null; });
-  exo.sets.push(newSet);
+  const blocks = _buildBlocks(_state.exercices);
+  const block  = blocks[_findBlockContaining(blocks, ei)];
+
+  if (block.type === 'superset') {
+    block.indices.forEach(idx => {
+      const exo    = _state.exercices[idx];
+      const fields = metricFields(exo.type_metrique);
+      const newSet = { repos: null, done: false, dbId: null };
+      fields.forEach(f => { newSet[f.key] = exo.sets.at(-1)?.[f.key] ?? null; });
+      exo.sets.push(newSet);
+    });
+  } else {
+    const exo    = _state.exercices[ei];
+    const fields = metricFields(exo.type_metrique);
+    const newSet = { repos: null, done: false, dbId: null };
+    fields.forEach(f => { newSet[f.key] = exo.sets.at(-1)?.[f.key] ?? null; });
+    exo.sets.push(newSet);
+  }
+
   render();
   setTimeout(() => {
     const cards = _section.querySelectorAll('.exercise-card');
-    cards[ei]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const blockIdx = _findBlockContaining(_buildBlocks(_state.exercices), ei);
+    cards[blockIdx]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, 60);
+}
+
+// ── Déplacer un bloc d'exercice ───────────────────────────────────────
+
+function _moveBlock(ei, dir) {
+  const blocks = _buildBlocks(_state.exercices);
+  const blockIdx = _findBlockContaining(blocks, ei);
+  const newIdx   = blockIdx + dir;
+  if (newIdx < 0 || newIdx >= blocks.length) return;
+
+  const groups = blocks.map(b =>
+    b.type === 'single' ? [_state.exercices[b.index]] : b.indices.map(i => _state.exercices[i])
+  );
+  [groups[blockIdx], groups[newIdx]] = [groups[newIdx], groups[blockIdx]];
+  _state.exercices = groups.flat();
+  render();
+}
+
+// ── Déplacer une série ────────────────────────────────────────────────
+
+function _moveSerie(ei, si, dir) {
+  const sets = _state.exercices[ei]?.sets;
+  if (!sets) return;
+  const newSi = si + dir;
+  if (newSi < 0 || newSi >= sets.length) return;
+  [sets[si], sets[newSi]] = [sets[newSi], sets[si]];
+  render();
+}
+
+function _moveRound(indices, r, dir) {
+  const newR    = r + dir;
+  const maxSets = Math.max(...indices.map(i => _state.exercices[i].sets.length));
+  if (newR < 0 || newR >= maxSets) return;
+  indices.forEach(idx => {
+    const sets = _state.exercices[idx].sets;
+    if (r < sets.length && newR < sets.length) [sets[r], sets[newR]] = [sets[newR], sets[r]];
+  });
+  render();
+}
+
+// ── Supprimer une série ────────────────────────────────────────────────
+
+async function _removeSerie(ei, si) {
+  const exo = _state.exercices[ei];
+  if (!exo) return;
+  if (exo.sets.length <= 1) { showToast('Minimum 1 série', 'warning'); return; }
+  const set = exo.sets[si];
+  if (set?.dbId) await supabase.from('series').delete().eq('id', set.dbId).catch(() => {});
+  exo.sets.splice(si, 1);
+  render();
+}
+
+async function _removeRound(indices, r) {
+  const maxSets = Math.max(...indices.map(i => _state.exercices[i].sets.length));
+  if (maxSets <= 1) { showToast('Minimum 1 série', 'warning'); return; }
+  for (const idx of indices) {
+    const s = _state.exercices[idx].sets[r];
+    if (s?.dbId) await supabase.from('series').delete().eq('id', s.dbId).catch(() => {});
+  }
+  indices.forEach(idx => _state.exercices[idx].sets.splice(r, 1));
+  render();
+}
+
+// ── Édition valeur série validée (enregistre en DB au blur) ──────────
+
+async function _onInputBlur(e) {
+  const input = e.target.closest('[data-field]');
+  if (!input) return;
+  const { field, exo: exoStr, set: setStr } = input.dataset;
+  const set = _state.exercices[parseInt(exoStr)]?.sets[parseInt(setStr)];
+  const f   = fieldByKey(field);
+  if (!set || !f || !set.done || !set.dbId) return;
+  set[field] = parseFieldValue(f, input.value);
+  const col = FIELD_DB_COLUMN[field];
+  if (col) await supabase.from('series').update({ [col]: set[field] }).eq('id', set.dbId).catch(() => {});
+}
+
+// ── Chrono séries avec durée cible ────────────────────────────────────
+
+function _clearAllTimers() {
+  _setTimers.forEach(id => clearInterval(id));
+  _setTimers.clear();
+}
+
+function _toggleTimer(ei, si) {
+  const key = `${ei}_${si}`;
+  if (_setTimers.has(key)) {
+    clearInterval(_setTimers.get(key));
+    _setTimers.delete(key);
+    const btn  = document.getElementById(`tmrbtn-${ei}-${si}`);
+    const prev = document.getElementById(`setprev-${ei}-${si}`);
+    if (btn)  btn.innerHTML  = _SVG_TIMER;
+    if (prev) prev.textContent = '';
+    return;
+  }
+
+  const input    = _section?.querySelector(`input[data-field="duree"][data-exo="${ei}"][data-set="${si}"]`);
+  const targetSec = parseInt(input?.value) || 0;
+  const startMs   = Date.now();
+
+  const btn = document.getElementById(`tmrbtn-${ei}-${si}`);
+  if (btn) btn.innerHTML = _SVG_STOP;
+
+  const id = setInterval(() => {
+    const elapsed   = Date.now() - startMs;
+    const remaining = Math.max(0, targetSec * 1000 - elapsed);
+    const btn2  = document.getElementById(`tmrbtn-${ei}-${si}`);
+    const prev2 = document.getElementById(`setprev-${ei}-${si}`);
+    if (!btn2 || !prev2) { clearInterval(id); _setTimers.delete(key); return; }
+
+    if (targetSec > 0) {
+      const secs = Math.ceil(remaining / 1000);
+      prev2.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+      if (remaining === 0) {
+        clearInterval(id);
+        _setTimers.delete(key);
+        btn2.innerHTML    = _SVG_TIMER;
+        prev2.textContent = '✓ Temps !';
+        navigator.vibrate?.(300);
+      }
+    } else {
+      const secs = Math.floor(elapsed / 1000);
+      prev2.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    }
+  }, 200);
+
+  _setTimers.set(key, id);
+}
+
+// ── Superset en séance ─────────────────────────────────────────────────
+
+function _makeSuperset(lastIdx) {
+  const exo  = _state.exercices[lastIdx];
+  const next = _state.exercices[lastIdx + 1];
+  if (!exo || !next) return;
+
+  exo.repos_inter = null;
+
+  const maxSets = Math.max(exo.sets.length, next.sets.length);
+  while (exo.sets.length < maxSets) {
+    const fields = metricFields(exo.type_metrique);
+    const s = { repos: null, done: false, dbId: null };
+    fields.forEach(f => { s[f.key] = exo.sets.at(-1)?.[f.key] ?? null; });
+    exo.sets.push(s);
+  }
+  while (next.sets.length < maxSets) {
+    const fields = metricFields(next.type_metrique);
+    const s = { repos: null, done: false, dbId: null };
+    fields.forEach(f => { s[f.key] = next.sets.at(-1)?.[f.key] ?? null; });
+    next.sets.push(s);
+  }
+  render();
+}
+
+function _breakSuperset(firstIdx) {
+  const blocks = _buildBlocks(_state.exercices);
+  const block  = blocks[_findBlockContaining(blocks, firstIdx)];
+  if (block.type !== 'superset') return;
+  block.indices.forEach(idx => {
+    if (_state.exercices[idx].repos_inter === null)
+      _state.exercices[idx].repos_inter = APP_CONFIG.defaultRestTime;
+  });
+  render();
+}
+
+// ── Popup détail exercice ──────────────────────────────────────────────
+
+async function _showExoDetail(ei) {
+  const nom = _state.exercices[ei]?.nom;
+  if (!nom) return;
+  const { getAllExercices, openExoDetail } = await import('./exercices.js');
+  const EXERCICES = await getAllExercices();
+  const exo = EXERCICES.find(e => e.nom === nom);
+  if (exo) openExoDetail(exo);
 }
 
 async function _toggleDone(ei, si) {

@@ -153,7 +153,10 @@ function _exoHTML(ex, i) {
             <path d="M6 5v14M18 5v14M3 8h3m12 0h3M3 16h3m12 0h3"/>
           </svg>
         </div>
-        <p style="flex:1;font-weight:700;font-size:.95rem">${_esc(ex.nom)}</p>
+        <button class="rb-exo-detail" data-uid="${ex.uid}"
+          style="flex:1;font-weight:700;font-size:.95rem;background:none;border:none;padding:0;text-align:left;cursor:pointer;color:inherit">
+          ${_esc(ex.nom)}
+        </button>
         <button class="rb-replace-exo icon-btn" data-uid="${ex.uid}" aria-label="Remplacer l'exercice">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
@@ -242,7 +245,20 @@ function _bindEvents() {
   _el.querySelector('#rb-save')?.addEventListener('click', _save);
   _el.querySelector('#rb-add-exo')?.addEventListener('click', () => _pickExo());
 
-  _el.querySelector('#rb-body')?.addEventListener('click', e => {
+  _el.querySelector('#rb-body')?.addEventListener('click', async e => {
+    const detail = e.target.closest('.rb-exo-detail');
+    if (detail) {
+      _syncDOM();
+      const ex = _findExo(detail.dataset.uid);
+      if (ex) {
+        const { getAllExercices, openExoDetail } = await import('./exercices.js');
+        const EXERCICES = await getAllExercices();
+        const exoData = EXERCICES.find(e2 => e2.nom === ex.nom);
+        if (exoData) openExoDetail(exoData);
+      }
+      return;
+    }
+
     const up = e.target.closest('.rb-up');
     if (up && !up.disabled) { _syncDOM(); _swap(up.dataset.uid, -1); return; }
 

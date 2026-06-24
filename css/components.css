@@ -429,6 +429,15 @@
   background: transparent; border-color: transparent;
   color: var(--text-secondary); pointer-events: none;
 }
+.set-input-done {
+  background: transparent; border-color: transparent;
+  color: var(--text-secondary);
+}
+.set-input-done:focus {
+  border-color: var(--color-primary);
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
 
 .set-check {
   width: 36px; height: 36px; border-radius: var(--radius-full);

@@ -390,7 +390,7 @@ async function _renderTous() {
     }
     list.innerHTML = filtered.map((e, i) => _exoItem(e, i, filtered)).join('');
     list.querySelectorAll('[data-exo-idx]').forEach(item => {
-      item.addEventListener('click', () => _showDetail(filtered[parseInt(item.dataset.exoIdx)]));
+      item.addEventListener('click', () => openExoDetail(filtered[parseInt(item.dataset.exoIdx)]));
     });
     _loadListImages(list);
   };
@@ -447,7 +447,7 @@ async function _renderMes() {
   _loadListImages(list);
 
   list.querySelectorAll('[data-exo-idx]').forEach(item => {
-    item.addEventListener('click', () => _showDetail(custom[parseInt(item.dataset.exoIdx)]));
+    item.addEventListener('click', () => openExoDetail(custom[parseInt(item.dataset.exoIdx)]));
   });
   list.querySelectorAll('[data-delete-exo]').forEach(btn => {
     btn.addEventListener('click', e => {
@@ -521,7 +521,7 @@ function _loadListImages(container) {
 
 // ── Détail exercice ───────────────────────────────────────────────────
 
-function _showDetail(exo) {
+export function openExoDetail(exo) {
   openModal({
     title: exo.nom,
     body: `
