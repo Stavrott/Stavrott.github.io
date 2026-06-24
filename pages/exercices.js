@@ -2,7 +2,7 @@ import { currentUser }  from '../js/auth.js';
 import { supabase }      from '../js/supabase.js';
 import { debounce, openModal, closeModal, showToast, showLoading, hideLoading, emptyState,
          calc1RM, formatDate, todayStr, lsGet, lsSet, svgLineChart, confirmDialog } from '../js/utils.js';
-import { fetchExerciseImage } from '../js/exercisedb.js';
+import { fetchExerciseImage, fetchExerciseImages } from '../js/exercisedb.js';
 import { METRIC_TYPES, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
 
 // ── Bibliothèque intégrée ─────────────────────────────────────────────
@@ -524,6 +524,7 @@ function _loadListImages(container) {
 export function openExoDetail(exo) {
   openModal({
     title: exo.nom,
+    onClose: _stopGifSlideshow,
     body: `
       <div style="display:flex;flex-direction:column;gap:var(--space-4)">
 
@@ -653,22 +654,61 @@ async function _loadProgression(exo) {
   }
 }
 
+let _gifSlideInterval = null;
+
+function _stopGifSlideshow() {
+  if (_gifSlideInterval) { clearInterval(_gifSlideInterval); _gifSlideInterval = null; }
+}
+
 async function _loadGif(exo) {
+  _stopGifSlideshow();
   const wrap = document.getElementById('exo-gif-inner');
   if (!wrap) return;
-  const url = await fetchExerciseImage(exo.nom);
+
+  const urls = await fetchExerciseImages(exo.nom);
   if (!wrap.isConnected) return;
-  if (url) {
-    wrap.innerHTML = `
-      <img src="${url}" alt="${exo.nom}"
-        onload="this.style.opacity='1'"
-        style="width:100%;max-height:280px;object-fit:contain;border-radius:8px;display:block;opacity:0;transition:opacity .3s">`;
-  } else {
+
+  if (!urls.length) {
     wrap.innerHTML = `
       <p style="font-size:.8rem;color:var(--text-muted);padding:20px;text-align:center">
         Illustration non disponible pour cet exercice
       </p>`;
+    return;
   }
+
+  const imgStyle = 'width:100%;max-height:260px;object-fit:contain;display:block;border-radius:8px;transition:opacity .6s ease-in-out';
+
+  if (urls.length === 1) {
+    wrap.innerHTML = `<img src="${urls[0]}" alt="${exo.nom}"
+      onload="this.style.opacity='1'" style="${imgStyle};opacity:0">`;
+    return;
+  }
+
+  // Diaporama crossfade entre les 2 positions (avant / après)
+  wrap.innerHTML = `
+    <div style="position:relative;width:100%;height:260px;border-radius:8px;overflow:hidden;background:var(--surface-3)">
+      <img id="exo-slide-0" src="${urls[0]}" alt="${exo.nom}"
+        style="${imgStyle};position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:1">
+      <img id="exo-slide-1" src="${urls[1]}" alt="${exo.nom}"
+        style="${imgStyle};position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0">
+      <span style="position:absolute;bottom:6px;right:8px;font-size:10px;font-weight:700;
+        color:rgba(255,255,255,.8);background:rgba(0,0,0,.45);padding:2px 7px;border-radius:4px;
+        letter-spacing:.03em">▶ Mouvement</span>
+    </div>`;
+
+  let visible = 0;
+  _gifSlideInterval = setInterval(() => {
+    // Arrêt automatique si le modal est fermé
+    const overlay = document.getElementById('modal-overlay');
+    if (!overlay || overlay.classList.contains('hidden')) { _stopGifSlideshow(); return; }
+
+    const a = document.getElementById('exo-slide-0');
+    const b = document.getElementById('exo-slide-1');
+    if (!a || !a.isConnected) { _stopGifSlideshow(); return; }
+    visible = 1 - visible;
+    a.style.opacity = visible === 0 ? '1' : '0';
+    b.style.opacity = visible === 1 ? '1' : '0';
+  }, 1200);
 }
 
 // ── Créer un exercice custom ──────────────────────────────────────────

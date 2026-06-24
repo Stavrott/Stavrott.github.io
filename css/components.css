@@ -439,6 +439,39 @@
   color: var(--text-primary);
 }
 
+/* ── Chrono de série ──────────────────────────────────────────────── */
+@keyframes timer-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+@keyframes timer-finish-flash {
+  0%, 100% { background: transparent; }
+  30%       { background: rgba(201, 163, 92, 0.22); }
+}
+
+.set-timer-active {
+  border-left: 3px solid var(--color-primary);
+  padding-left: calc(var(--space-4) - 3px);
+  background: rgba(201, 163, 92, 0.06) !important;
+}
+.set-timer-countdown {
+  font-size: 1.35rem !important;
+  font-weight: 900 !important;
+  color: var(--color-primary) !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+  animation: timer-pulse 1s ease-in-out infinite;
+  white-space: nowrap;
+}
+.set-timer-done {
+  font-size: .95rem !important;
+  font-weight: 800 !important;
+  color: var(--color-success, #4caf50) !important;
+}
+.set-timer-finished {
+  animation: timer-finish-flash 2s ease-out forwards;
+}
+
 .set-check {
   width: 36px; height: 36px; border-radius: var(--radius-full);
   background: var(--surface-2); border: 2px solid var(--border-strong);

@@ -112,6 +112,20 @@ function _cacheWrite(nom, url) {
   try { localStorage.setItem(`eximg_${nom}`, JSON.stringify({ url, ts: Date.now() })); } catch {}
 }
 
+function _cacheReadK(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return undefined;
+    const { url, ts } = JSON.parse(raw);
+    if (Date.now() - ts > TTL) { localStorage.removeItem(key); return undefined; }
+    return url;
+  } catch { return undefined; }
+}
+
+function _cacheWriteK(key, url) {
+  try { localStorage.setItem(key, JSON.stringify({ url, ts: Date.now() })); } catch {}
+}
+
 // ── Fetch image ───────────────────────────────────────────────────────
 
 export async function fetchExerciseImage(nomFr) {
@@ -131,6 +145,29 @@ export async function fetchExerciseImage(nomFr) {
   }
   _cacheWrite(nomFr, '');
   return null;
+}
+
+// Retourne un tableau de 0, 1 ou 2 URLs (toutes les images disponibles pour cet exercice).
+export async function fetchExerciseImages(nomFr) {
+  const folder = IMG_MAP[nomFr];
+  if (!folder) return [];
+
+  const urls = [];
+  for (const idx of [0, 1]) {
+    const key = `eximgm_${nomFr}_${idx}`;
+    const cached = _cacheReadK(key);
+    if (cached !== undefined) {
+      if (cached) urls.push(cached);
+      continue;
+    }
+    const url = `${CDN}/${folder}/${idx}.jpg`;
+    try {
+      const res = await fetch(url, { method: 'HEAD' });
+      if (res.ok) { _cacheWriteK(key, url); urls.push(url); }
+      else           _cacheWriteK(key, '');
+    } catch { _cacheWriteK(key, ''); }
+  }
+  return urls;
 }
 
 // ── Compat (ancienne API — plus utilisée) ─────────────────────────────

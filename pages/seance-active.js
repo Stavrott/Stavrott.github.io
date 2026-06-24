@@ -767,43 +767,58 @@ function _clearAllTimers() {
 
 function _toggleTimer(ei, si) {
   const key = `${ei}_${si}`;
+  const row = _section?.querySelector(`.set-row[data-exo="${ei}"][data-set="${si}"]`);
+
   if (_setTimers.has(key)) {
     clearInterval(_setTimers.get(key));
     _setTimers.delete(key);
     const btn  = document.getElementById(`tmrbtn-${ei}-${si}`);
     const prev = document.getElementById(`setprev-${ei}-${si}`);
-    if (btn)  btn.innerHTML  = _SVG_TIMER;
-    if (prev) prev.textContent = '';
+    if (btn)  btn.innerHTML = _SVG_TIMER;
+    if (prev) { prev.textContent = ''; prev.className = 'set-prev'; }
+    row?.classList.remove('set-timer-active');
     return;
   }
 
-  const input    = _section?.querySelector(`input[data-field="duree"][data-exo="${ei}"][data-set="${si}"]`);
+  const input     = _section?.querySelector(`input[data-field="duree"][data-exo="${ei}"][data-set="${si}"]`);
   const targetSec = parseInt(input?.value) || 0;
   const startMs   = Date.now();
 
   const btn = document.getElementById(`tmrbtn-${ei}-${si}`);
   if (btn) btn.innerHTML = _SVG_STOP;
+  row?.classList.add('set-timer-active');
+
+  const prevEl = document.getElementById(`setprev-${ei}-${si}`);
+  if (prevEl) prevEl.className = 'set-prev set-timer-countdown';
+
+  function _fmt(secs) {
+    const m = Math.floor(secs / 60), s = secs % 60;
+    return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`;
+  }
 
   const id = setInterval(() => {
     const elapsed   = Date.now() - startMs;
     const remaining = Math.max(0, targetSec * 1000 - elapsed);
     const btn2  = document.getElementById(`tmrbtn-${ei}-${si}`);
     const prev2 = document.getElementById(`setprev-${ei}-${si}`);
-    if (!btn2 || !prev2) { clearInterval(id); _setTimers.delete(key); return; }
+    const row2  = _section?.querySelector(`.set-row[data-exo="${ei}"][data-set="${si}"]`);
+    if (!prev2 || !prev2.isConnected) { clearInterval(id); _setTimers.delete(key); return; }
 
     if (targetSec > 0) {
-      const secs = Math.ceil(remaining / 1000);
-      prev2.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+      prev2.textContent = _fmt(Math.ceil(remaining / 1000));
       if (remaining === 0) {
         clearInterval(id);
         _setTimers.delete(key);
-        btn2.innerHTML    = _SVG_TIMER;
-        prev2.textContent = '✓ Temps !';
+        if (btn2) btn2.innerHTML = _SVG_TIMER;
+        prev2.textContent = '✓ Terminé !';
+        prev2.className   = 'set-prev set-timer-done';
+        row2?.classList.remove('set-timer-active');
+        row2?.classList.add('set-timer-finished');
+        setTimeout(() => row2?.classList.remove('set-timer-finished'), 2000);
         navigator.vibrate?.(300);
       }
     } else {
-      const secs = Math.floor(elapsed / 1000);
-      prev2.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+      prev2.textContent = _fmt(Math.floor(elapsed / 1000));
     }
   }, 200);
 
