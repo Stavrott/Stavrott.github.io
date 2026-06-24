@@ -8,6 +8,7 @@ import { estimateCaloriesSeance, musclesTravailles } from '../js/calories.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 import { getPoidsActuel } from './profil.js';
 import { navigate } from '../js/router.js';
+import { fetchExerciseImage } from '../js/exercisedb.js';
 
 // ── État global ───────────────────────────────────────────────────────
 
@@ -208,6 +209,19 @@ function render() {
     </button>`;
 
   _bindEvents();
+  _loadCardImages();
+}
+
+function _loadCardImages() {
+  const list = document.getElementById('exo-cards-list');
+  if (!list) return;
+  list.querySelectorAll('.exo-thumb[data-img-nom]').forEach(el => {
+    const nom = el.dataset.imgNom;
+    fetchExerciseImage(nom).then(url => {
+      if (!el.isConnected || !url) return;
+      el.innerHTML = `<img src="${url}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">`;
+    });
+  });
 }
 
 function _statsLabel(exoCount, setsDone) {
@@ -244,6 +258,10 @@ function _singleCardHTML(exo, ei, blockIdx, totalBlocks) {
             style="width:22px;height:22px${isLast ? ';opacity:.25;pointer-events:none' : ''}">
             ${_SVG_DOWN}
           </button>
+        </div>
+        <div class="exo-thumb" data-img-nom="${_esc(exo.nom)}"
+          style="width:40px;height:40px;min-width:40px;border-radius:8px;overflow:hidden;
+            background:var(--surface-3);display:flex;align-items:center;justify-content:center;flex-shrink:0">
         </div>
         <div class="exercise-card-info">
           <h3 class="exercise-card-name" style="cursor:pointer" data-action="show-exo-detail" data-exo="${ei}">${_esc(exo.nom)}</h3>
