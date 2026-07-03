@@ -21,6 +21,58 @@ let _lastActiveExoIndex = null; // dernier exercice dont une série a été vali
 
 const _setTimers = new Map(); // timers actifs par série, clé `${ei}_${si}`
 
+// ── Persistance localStorage (survie aux rechargements SW) ────────────
+
+const _PERSIST_KEY = 'forme_active_seance';
+
+function _persistState() {
+  if (!_state || !_startTime) return;
+  try {
+    localStorage.setItem(_PERSIST_KEY, JSON.stringify({
+      seanceId:            _state.seance.id,
+      seanceNom:           _state.seance.nom,
+      seanceDate:          _state.seance.date,
+      startTime:           _startTime,
+      routineId:           _state.routineId ?? null,
+      routineExerciceNoms: _state.routineExerciceNoms ?? [],
+      exercices:           _state.exercices,
+    }));
+  } catch {}
+}
+
+function _clearPersist() {
+  try { localStorage.removeItem(_PERSIST_KEY); } catch {}
+}
+
+export async function tryRestoreSeance() {
+  if (_state) return true; // déjà une séance active
+  try {
+    const raw = localStorage.getItem(_PERSIST_KEY);
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    if (!saved?.seanceId || !saved?.startTime) return false;
+
+    // Vérifie que la séance existe en DB et n'est pas déjà terminée
+    const { data } = await supabase.from('seances')
+      .select('id, nom, date, duree_minutes')
+      .eq('id', saved.seanceId).single();
+    if (!data || data.duree_minutes != null) { _clearPersist(); return false; }
+
+    _state = {
+      seance:              { id: data.id, nom: data.nom, date: data.date },
+      routineId:           saved.routineId ?? null,
+      routineExerciceNoms: saved.routineExerciceNoms ?? [],
+      exercices:           saved.exercices ?? [],
+    };
+    _startTime = saved.startTime;
+    _lastActiveExoIndex = null;
+    return true;
+  } catch {
+    _clearPersist();
+    return false;
+  }
+}
+
 const _uid = () => Math.random().toString(36).slice(2, 10);
 const _esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
@@ -582,6 +634,7 @@ export async function addExercice(nom, { superset = false } = {}) {
   });
 
   render();
+  _persistState();
   setTimeout(() => {
     const cards = _section.querySelectorAll('.exercise-card');
     cards[cards.length - 1]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -612,6 +665,7 @@ async function _replaceExercice(ei, nom) {
   };
 
   render();
+  _persistState();
   showToast(`Remplacé par "${nom}"`, 'success');
 }
 
@@ -631,6 +685,7 @@ export async function addExercices(noms) {
   });
 
   render();
+  _persistState();
 }
 
 // Lance les exercices d'une routine en reprenant sa configuration complète
@@ -669,12 +724,14 @@ export async function addExercicesFromRoutine(routine) {
   });
 
   render();
+  _persistState();
 }
 
 async function _removeExo(ei) {
   if (!await confirmDialog(`Supprimer "${_state.exercices[ei]?.nom}" de la séance ?`)) return;
   _state.exercices.splice(ei, 1);
   render();
+  _persistState();
 }
 
 function _addSerie(ei) {
@@ -698,6 +755,7 @@ function _addSerie(ei) {
   }
 
   render();
+  _persistState();
   setTimeout(() => {
     const cards = _section.querySelectorAll('.exercise-card');
     const blockIdx = _findBlockContaining(_buildBlocks(_state.exercices), ei);
@@ -719,6 +777,7 @@ function _moveBlock(ei, dir) {
   [groups[blockIdx], groups[newIdx]] = [groups[newIdx], groups[blockIdx]];
   _state.exercices = groups.flat();
   render();
+  _persistState();
 }
 
 // ── Déplacer une série ────────────────────────────────────────────────
@@ -730,6 +789,7 @@ function _moveSerie(ei, si, dir) {
   if (newSi < 0 || newSi >= sets.length) return;
   [sets[si], sets[newSi]] = [sets[newSi], sets[si]];
   render();
+  _persistState();
 }
 
 function _moveRound(indices, r, dir) {
@@ -741,6 +801,7 @@ function _moveRound(indices, r, dir) {
     if (r < sets.length && newR < sets.length) [sets[r], sets[newR]] = [sets[newR], sets[r]];
   });
   render();
+  _persistState();
 }
 
 // ── Supprimer une série ────────────────────────────────────────────────
@@ -753,6 +814,7 @@ async function _removeSerie(ei, si) {
   if (set?.dbId) await supabase.from('series').delete().eq('id', set.dbId).catch(() => {});
   exo.sets.splice(si, 1);
   render();
+  _persistState();
 }
 
 async function _removeRound(indices, r) {
@@ -764,6 +826,7 @@ async function _removeRound(indices, r) {
   }
   indices.forEach(idx => _state.exercices[idx].sets.splice(r, 1));
   render();
+  _persistState();
 }
 
 // ── Édition valeur série validée (enregistre en DB au blur) ──────────
@@ -794,10 +857,8 @@ function _toggleTimer(ei, si) {
   if (_setTimers.has(key)) {
     clearInterval(_setTimers.get(key));
     _setTimers.delete(key);
-    const btn  = document.getElementById(`tmrbtn-${ei}-${si}`);
-    const prev = document.getElementById(`setprev-${ei}-${si}`);
-    if (btn)  btn.innerHTML = _SVG_TIMER;
-    if (prev) { prev.textContent = ''; prev.className = 'set-prev'; }
+    const btn = document.getElementById(`tmrbtn-${ei}-${si}`);
+    if (btn) { btn.innerHTML = _SVG_TIMER; btn.classList.remove('set-btn-timer-active'); }
     row?.classList.remove('set-timer-active');
     return;
   }
@@ -806,41 +867,39 @@ function _toggleTimer(ei, si) {
   const targetSec = parseInt(input?.value) || 0;
   const startMs   = Date.now();
 
-  const btn = document.getElementById(`tmrbtn-${ei}-${si}`);
-  if (btn) btn.innerHTML = _SVG_STOP;
-  row?.classList.add('set-timer-active');
-
-  const prevEl = document.getElementById(`setprev-${ei}-${si}`);
-  if (prevEl) prevEl.className = 'set-prev set-timer-countdown';
-
   function _fmt(secs) {
     const m = Math.floor(secs / 60), s = secs % 60;
     return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`;
   }
 
+  const btn = document.getElementById(`tmrbtn-${ei}-${si}`);
+  if (btn) {
+    btn.classList.add('set-btn-timer-active');
+    btn.textContent = targetSec > 0 ? _fmt(targetSec) : '0s';
+  }
+  row?.classList.add('set-timer-active');
+
   const id = setInterval(() => {
     const elapsed   = Date.now() - startMs;
     const remaining = Math.max(0, targetSec * 1000 - elapsed);
-    const btn2  = document.getElementById(`tmrbtn-${ei}-${si}`);
-    const prev2 = document.getElementById(`setprev-${ei}-${si}`);
-    const row2  = _section?.querySelector(`.set-row[data-exo="${ei}"][data-set="${si}"]`);
-    if (!prev2 || !prev2.isConnected) { clearInterval(id); _setTimers.delete(key); return; }
+    const btn2 = document.getElementById(`tmrbtn-${ei}-${si}`);
+    const row2 = _section?.querySelector(`.set-row[data-exo="${ei}"][data-set="${si}"]`);
+    if (!btn2 || !btn2.isConnected) { clearInterval(id); _setTimers.delete(key); return; }
 
     if (targetSec > 0) {
-      prev2.textContent = _fmt(Math.ceil(remaining / 1000));
+      btn2.textContent = _fmt(Math.ceil(remaining / 1000));
       if (remaining === 0) {
         clearInterval(id);
         _setTimers.delete(key);
-        if (btn2) btn2.innerHTML = _SVG_TIMER;
-        prev2.textContent = '✓ Terminé !';
-        prev2.className   = 'set-prev set-timer-done';
+        btn2.innerHTML = _SVG_TIMER;
+        btn2.classList.remove('set-btn-timer-active');
         row2?.classList.remove('set-timer-active');
         row2?.classList.add('set-timer-finished');
         setTimeout(() => row2?.classList.remove('set-timer-finished'), 2000);
         navigator.vibrate?.(300);
       }
     } else {
-      prev2.textContent = _fmt(Math.floor(elapsed / 1000));
+      btn2.textContent = _fmt(Math.floor(elapsed / 1000));
     }
   }, 200);
 
@@ -870,6 +929,7 @@ function _makeSuperset(lastIdx) {
     next.sets.push(s);
   }
   render();
+  _persistState();
 }
 
 function _breakSuperset(firstIdx) {
@@ -881,6 +941,7 @@ function _breakSuperset(firstIdx) {
       _state.exercices[idx].repos_inter = APP_CONFIG.defaultRestTime;
   });
   render();
+  _persistState();
 }
 
 // ── Popup détail exercice ──────────────────────────────────────────────
@@ -942,6 +1003,7 @@ async function _toggleDone(ei, si) {
   }
 
   render();
+  _persistState();
 }
 
 // Valide un round entier de superset (tous les exercices du groupe en une
@@ -996,6 +1058,7 @@ async function _toggleRound(indices, r) {
   startRestTimer(last?.sets[r]?.repos ?? APP_CONFIG.defaultRestTime);
 
   render();
+  _persistState();
 }
 
 // ── Dernière perf ─────────────────────────────────────────────────────
@@ -1219,8 +1282,8 @@ async function _confirmFinish() {
 }
 
 async function _doFinish(duree, calories, muscles) {
-  closeModal();
   const notes = document.getElementById('seance-notes-final')?.value.trim() || null;
+  closeModal();
   try {
     await supabase.from('seances').update({
       duree_minutes: duree, notes,
@@ -1270,6 +1333,7 @@ function _reset() {
   clearInterval(_elapsedId);
   _elapsedId = null;
   hideTimer(); // une séance terminée/annulée ne doit pas laisser un repos en cours derrière elle
+  _clearPersist();
   const onFinish = _onFinish;
   _state = _section = _onFinish = _startTime = null;
   _lastActiveExoIndex = null;

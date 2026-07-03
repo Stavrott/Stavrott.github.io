@@ -471,6 +471,14 @@
 .set-timer-finished {
   animation: timer-finish-flash 2s ease-out forwards;
 }
+.set-btn-timer-active {
+  width: auto !important; min-width: 44px;
+  font-size: .95rem !important; font-weight: 900 !important;
+  color: var(--color-primary) !important;
+  font-variant-numeric: tabular-nums;
+  animation: timer-pulse 1s ease-in-out infinite;
+  padding: 0 4px;
+}
 
 .set-check {
   width: 36px; height: 36px; border-radius: var(--radius-full);

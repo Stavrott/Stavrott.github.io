@@ -1,12 +1,13 @@
 import { currentUser }       from '../js/auth.js';
 import { supabase }           from '../js/supabase.js';
 import { showToast, formatDate, formatDuration, openModal, closeModal, emptyState, showLoading, hideLoading, confirmDialog, escapeHtml } from '../js/utils.js';
-import { hasActiveSeance, startSeance, resumeActiveView } from './seance-active.js';
+import { hasActiveSeance, startSeance, resumeActiveView, tryRestoreSeance } from './seance-active.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 
 // ── Chargement de la page ─────────────────────────────────────────────
 
 export async function loadSeances(section) {
+  if (!hasActiveSeance()) await tryRestoreSeance();
   if (hasActiveSeance()) { resumeActiveView(section); return; }
 
   section.innerHTML = `
