@@ -329,7 +329,8 @@ function _openIdentiteModal(profil, section) {
     const taille = parseInt(overlay.querySelector('#m-taille').value) || null;
     const sexe   = overlay.querySelector('input[name="m-sexe"]:checked')?.value || null;
     try {
-      await supabase.from('profils').upsert({ user_id: currentUser.id, age, taille_cm: taille, sexe }, { onConflict: 'user_id' });
+      const { error } = await supabase.from('profils').upsert({ user_id: currentUser.id, age, taille_cm: taille, sexe }, { onConflict: 'user_id' });
+      if (error) throw error;
       showToast('Profil mis à jour', 'success');
       overlay.remove();
       await _reload(section);
@@ -436,13 +437,14 @@ function _openProgrammeModal(profil, section) {
 
   overlay.querySelector('#prog-save').addEventListener('click', async () => {
     try {
-      await supabase.from('profils').upsert({
+      const { error } = await supabase.from('profils').upsert({
         user_id:   currentUser.id,
         objectif:  sel.objectif,
         niveau:    sel.niveau,
         frequence: sel.frequence,
         lieu:      sel.lieu,
       }, { onConflict: 'user_id' });
+      if (error) throw error;
       showToast('Programme mis à jour', 'success');
       overlay.remove();
       await _reload(section);
@@ -486,7 +488,8 @@ function _openEquipModal(profil, section) {
 
   overlay.querySelector('#eq-save').addEventListener('click', async () => {
     try {
-      await supabase.from('profils').upsert({ user_id: currentUser.id, equipements: equip }, { onConflict: 'user_id' });
+      const { error } = await supabase.from('profils').upsert({ user_id: currentUser.id, equipements: equip }, { onConflict: 'user_id' });
+      if (error) throw error;
       showToast('Équipements mis à jour', 'success');
       overlay.remove();
       await _reload(section);
@@ -518,9 +521,10 @@ function _openPoidsModal(isUpdate, section) {
     const val = parseFloat(overlay.querySelector('#poids-input').value);
     if (!val || val < 20 || val > 300) { showToast('Entrez un poids valide', 'warning'); return; }
     try {
-      await supabase.from('historique_poids').upsert({
+      const { error } = await supabase.from('historique_poids').upsert({
         user_id: currentUser.id, date: todayStr(), poids_kg: val,
       }, { onConflict: 'user_id,date' });
+      if (error) throw error;
       showToast('Poids enregistré', 'success');
       overlay.remove();
       await _reload(section);

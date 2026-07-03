@@ -36,11 +36,12 @@ async function _renderResumes(section) {
 
   try {
     const now      = new Date();
-    const weekAgo  = new Date(now - 7  * 86400000).toISOString().split('T')[0];
+    const dow      = now.getDay(); // 0=dim
+    const weekStart = new Date(Date.now() - (dow === 0 ? 6 : dow - 1) * 86400000).toISOString().split('T')[0];
     const monthAgo = new Date(now - 30 * 86400000).toISOString().split('T')[0];
 
     const [{ data: week }, { data: month }, { data: allSeances }] = await Promise.all([
-      supabase.from('seances').select('id, duree_minutes, date, calories_estimees, muscles_travailles').eq('user_id', currentUser.id).gte('date', weekAgo),
+      supabase.from('seances').select('id, duree_minutes, date, calories_estimees, muscles_travailles').eq('user_id', currentUser.id).gte('date', weekStart),
       supabase.from('seances').select('id, duree_minutes').eq('user_id', currentUser.id).gte('date', monthAgo),
       supabase.from('seances').select('id').eq('user_id', currentUser.id),
     ]);
@@ -100,7 +101,7 @@ async function _renderResumes(section) {
         <div style="display:flex;align-items:flex-end;gap:var(--space-2);height:60px">
           ${_frequencyBars(week ?? [])}
         </div>
-        <p style="font-size:var(--font-size-xs);color:var(--text-muted);margin-top:var(--space-2)">7 derniers jours</p>
+        <p style="font-size:var(--font-size-xs);color:var(--text-muted);margin-top:var(--space-2)">Semaine en cours</p>
       </div>
 
       <!-- Total -->
