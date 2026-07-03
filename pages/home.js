@@ -9,13 +9,14 @@ import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body
 
 async function fetchDashboard(userId) {
   const today = todayStr();
-  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+  const dow = new Date().getDay();
+  const weekStart = new Date(Date.now() - (dow === 0 ? 6 : dow - 1) * 86400000).toISOString().split('T')[0];
 
   const [{ data: seancesWeek }, { data: seanceToday }, { data: lastSeance }] = await Promise.all([
     supabase.from('seances')
       .select('id, date, duree_minutes, nom, calories_estimees, muscles_travailles')
       .eq('user_id', userId)
-      .gte('date', weekAgo)
+      .gte('date', weekStart)
       .order('date', { ascending: false }),
 
     supabase.from('seances')
