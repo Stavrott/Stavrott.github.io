@@ -217,11 +217,12 @@ async function _renderProgression(section) {
   content.innerHTML = _skeleton();
 
   try {
-    // Récupérer la liste des exercices utilisés
+    // Récupérer la liste des exercices avec données de poids (charge réelle)
     const { data: exoList } = await supabase
       .from('series')
       .select('exercice_nom')
-      .eq('user_id', currentUser.id);
+      .eq('user_id', currentUser.id)
+      .not('poids_kg', 'is', null);
 
     const exoNames = [...new Set((exoList ?? []).map(s => s.exercice_nom))].sort();
 
@@ -268,16 +269,13 @@ async function _renderProgression(section) {
         return;
       }
 
-      // Grouper par séance (et non par jour calendaire) → meilleur 1RM par
-      // séance, sinon deux séances le même jour s'écrasent en un seul point.
+      // Grouper par séance — charge max réelle soulevée (et reps associées)
       const bySeance = {};
       for (const s of series) {
         const key = s.seance_id;
-        const orm = calc1RM(s.poids_kg, s.repetitions);
-        if (!bySeance[key]) bySeance[key] = { date: s.created_at, orm: 0, poids: null, reps: null };
+        if (!bySeance[key]) bySeance[key] = { date: s.created_at, poids: 0, reps: null };
         if (s.created_at < bySeance[key].date) bySeance[key].date = s.created_at;
-        if (orm > bySeance[key].orm) {
-          bySeance[key].orm   = orm;
+        if (s.poids_kg > bySeance[key].poids) {
           bySeance[key].poids = s.poids_kg;
           bySeance[key].reps  = s.repetitions;
         }
@@ -285,10 +283,10 @@ async function _renderProgression(section) {
 
       const points = Object.values(bySeance).sort((a, b) => a.date.localeCompare(b.date));
 
-      const bestOrm  = Math.max(...points.map(p => p.orm));
-      const firstOrm = points[0].orm;
-      const lastOrm  = points.at(-1).orm;
-      const gain     = lastOrm - firstOrm;
+      const bestPoids  = Math.max(...points.map(p => p.poids));
+      const firstPoids = points[0].poids;
+      const lastPoids  = points.at(-1).poids;
+      const gain       = Math.round((lastPoids - firstPoids) * 10) / 10;
 
       chartEl.innerHTML = `
         <!-- Stat cards -->
@@ -296,8 +294,8 @@ async function _renderProgression(section) {
           <div class="record-card">
             <div class="record-trophy">🏆</div>
             <div class="record-body">
-              <p class="record-label">Record 1RM</p>
-              <p class="record-value">${bestOrm} kg</p>
+              <p class="record-label">Charge max</p>
+              <p class="record-value">${bestPoids} kg</p>
             </div>
           </div>
           <div class="card" style="text-align:center">
@@ -310,10 +308,10 @@ async function _renderProgression(section) {
 
         <!-- Graphique SVG -->
         <div class="card" style="padding:var(--space-4)">
-          <p class="card-title" style="margin-bottom:var(--space-3)">1RM estimé dans le temps</p>
-          ${svgLineChart(points.map(p => ({ x: new Date(p.date).getTime(), y: p.orm, label: p.date })))}
+          <p class="card-title" style="margin-bottom:var(--space-3)">Charge maximale dans le temps</p>
+          ${svgLineChart(points.map(p => ({ x: new Date(p.date).getTime(), y: p.poids, label: p.date })))}
           <p style="font-size:var(--font-size-xs);color:var(--text-muted);margin-top:var(--space-2);text-align:right">
-            ${points.length} séances · ${formatDate(points[0].date)} → ${formatDate(points.at(-1).date)}
+            ${points.length} séance${points.length > 1 ? 's' : ''} · ${formatDate(points[0].date)} → ${formatDate(points.at(-1).date)}
           </p>
         </div>`;
     };
