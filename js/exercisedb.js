@@ -172,27 +172,20 @@ async function _fetchWithTimeout(url, opts = {}, ms = 5000) {
 // ── API publique ───────────────────────────────────────────────────────
 
 // Retourne la première image disponible (thumbnail, usage liste d'exercices).
+// Pour les exercices du mapping statique (dossiers vérifiés), on retourne
+// l'URL directement — pas de HEAD request qui peut échouer/être mis en cache
+// vide. Le navigateur gère le chargement et son propre cache HTTP.
 export async function fetchExerciseImage(nomFr) {
+  const folder = IMG_MAP[nomFr];
+  if (folder) return `${CDN}/${folder}/0.jpg`;
+
+  // Pas dans le mapping statique : essaie wger avec cache localStorage
   const cached = _cacheRead(nomFr);
   if (cached !== undefined) return cached || null;
 
-  const folder = IMG_MAP[nomFr];
-  if (!folder) {
-    // Pas dans le mapping statique : essaie wger pour ne pas retourner null inutilement
-    const wger = await _fetchWgerImages(nomFr);
-    _cacheWrite(nomFr, wger[0] ?? '');
-    return wger[0] ?? null;
-  }
-
-  for (const idx of [0, 1]) {
-    const url = `${CDN}/${folder}/${idx}.jpg`;
-    try {
-      const res = await _fetchWithTimeout(url, { method: 'HEAD' }, 4000);
-      if (res.ok) { _cacheWrite(nomFr, url); return url; }
-    } catch {}
-  }
-  _cacheWrite(nomFr, '');
-  return null;
+  const wger = await _fetchWgerImages(nomFr);
+  _cacheWrite(nomFr, wger[0] ?? '');
+  return wger[0] ?? null;
 }
 
 // Retourne jusqu'à 2 URLs pour le diaporama (yuhonas en priorité, wger en fallback).

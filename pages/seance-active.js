@@ -271,7 +271,7 @@ function _loadCardImages() {
     const nom = el.dataset.imgNom;
     fetchExerciseImage(nom).then(url => {
       if (!el.isConnected || !url) return;
-      el.innerHTML = `<img src="${url}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">`;
+      el.innerHTML = `<img src="${url}" alt="" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display='none'">`;
     });
   });
 }
