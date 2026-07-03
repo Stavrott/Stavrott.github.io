@@ -441,6 +441,7 @@ async function boot() {
     navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' })
       .then((reg) => reg.update().catch(() => {}))
       .catch(() => {});
+    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
   }
 }
 
