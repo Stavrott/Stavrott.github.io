@@ -10,6 +10,9 @@ export async function loadSeances(section) {
   if (!hasActiveSeance()) await tryRestoreSeance();
   if (hasActiveSeance()) { resumeActiveView(section); return; }
 
+  const repaired = await _repairIncompleteSessions();
+  if (repaired > 0) showToast(`${repaired} séance${repaired > 1 ? 's' : ''} récupérée${repaired > 1 ? 's' : ''} ✓`, 'success', 4000);
+
   section.innerHTML = `
     <div class="page-section">
       <button class="btn btn-primary btn-full btn-lg" id="btn-new-seance">
@@ -41,6 +44,79 @@ export async function loadSeances(section) {
   });
 
   await _loadList(section, 'recentes');
+}
+
+// ── Réparation des séances incomplètes ───────────────────────────────
+// Séances dont duree_minutes est NULL parce que le SW a rechargé la page
+// en cours de séance. On recalcule durée / calories / muscles depuis les
+// séries déjà sauvegardées en DB, comme le ferait _doFinish normalement.
+
+async function _repairIncompleteSessions() {
+  try {
+    const { data: incomplete } = await supabase
+      .from('seances')
+      .select('id')
+      .eq('user_id', currentUser.id)
+      .is('duree_minutes', null);
+
+    if (!incomplete?.length) return 0;
+
+    const [{ getAllExercices }, { getPoidsActuel }, { estimateCaloriesSeance }] = await Promise.all([
+      import('./exercices.js'),
+      import('./profil.js'),
+      import('../js/calories.js'),
+    ]);
+
+    const [EXERCICES, poidsKg] = await Promise.all([getAllExercices(), getPoidsActuel()]);
+
+    let count = 0;
+
+    for (const { id } of incomplete) {
+      const { data: series } = await supabase
+        .from('series')
+        .select('exercice_nom, poids_kg, repetitions, duree_s, vitesse_kmh, created_at')
+        .eq('seance_id', id)
+        .order('created_at', { ascending: true });
+
+      if (!series?.length) continue; // séance sans série → rien à récupérer
+
+      // Durée : intervalle entre la première et la dernière série
+      const firstMs = new Date(series[0].created_at).getTime();
+      const lastMs  = new Date(series.at(-1).created_at).getTime();
+      const dureeMinutes = Math.max(1, Math.round((lastMs - firstMs) / 60000));
+
+      // Muscles : depuis la bibliothèque d'exercices
+      const seenNoms   = [...new Set(series.map(s => s.exercice_nom))];
+      const muscleCounts = new Map();
+      for (const nom of seenNoms) {
+        const exo = EXERCICES.find(e => e.nom === nom);
+        for (const m of exo?.muscles ?? []) muscleCounts.set(m, (muscleCounts.get(m) ?? 0) + 1);
+      }
+      const muscles = [...muscleCounts.entries()].sort((a, b) => b[1] - a[1]).map(([m]) => m);
+
+      // Calories : même formule que estimateCaloriesSeance
+      const exercices = seenNoms.map(nom => {
+        const exo = EXERCICES.find(e => e.nom === nom);
+        return {
+          type_metrique: exo?.type_metrique ?? 'kg_reps',
+          sets: series.filter(s => s.exercice_nom === nom).map(() => ({ done: true })),
+        };
+      });
+      const calories = estimateCaloriesSeance(exercices, dureeMinutes, poidsKg);
+
+      await supabase.from('seances').update({
+        duree_minutes:      dureeMinutes,
+        calories_estimees:  calories,
+        muscles_travailles: muscles.length ? muscles : null,
+      }).eq('id', id);
+
+      count++;
+    }
+
+    return count;
+  } catch {
+    return 0;
+  }
 }
 
 // ── Onglet Récentes ───────────────────────────────────────────────────
