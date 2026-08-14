@@ -1,7 +1,7 @@
 import { currentUser }       from '../js/auth.js';
 import { supabase }           from '../js/supabase.js';
 import { showToast, formatDate, formatDuration, openModal, closeModal, emptyState, showLoading, hideLoading, confirmDialog, escapeHtml } from '../js/utils.js';
-import { hasActiveSeance, startSeance, resumeActiveView, tryRestoreSeance } from './seance-active.js';
+import { hasActiveSeance, startSeance, resumeActiveView, tryRestoreSeance, MAX_OVERHEAD_MIN } from './seance-active.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 
 // ── Chargement de la page ─────────────────────────────────────────────
@@ -12,6 +12,9 @@ export async function loadSeances(section) {
 
   const repaired = await _repairIncompleteSessions();
   if (repaired > 0) showToast(`${repaired} séance${repaired > 1 ? 's' : ''} récupérée${repaired > 1 ? 's' : ''} ✓`, 'success', 4000);
+
+  const corrigees = await _repairAberrantSessions();
+  if (corrigees > 0) showToast(`${corrigees} durée${corrigees > 1 ? 's' : ''} corrigée${corrigees > 1 ? 's' : ''} ✓`, 'success', 4000);
 
   section.innerHTML = `
     <div class="page-section">
@@ -51,6 +54,59 @@ export async function loadSeances(section) {
 // en cours de séance. On recalcule durée / calories / muscles depuis les
 // séries déjà sauvegardées en DB, comme le ferait _doFinish normalement.
 
+// Au-delà de 5 h, ce n'est plus une séance mais un chrono resté en route.
+const _ABERRANT_DUREE_MIN = 300;
+
+// Contexte partagé (bibliothèque d'exercices + poids de corps), chargé une
+// seule fois pour les deux réparations.
+async function _repairContext() {
+  const [{ getAllExercices }, { getPoidsActuel }, { estimateCaloriesSeance }] = await Promise.all([
+    import('./exercices.js'),
+    import('./profil.js'),
+    import('../js/calories.js'),
+  ]);
+  const [EXERCICES, poidsKg] = await Promise.all([getAllExercices(), getPoidsActuel()]);
+  return { EXERCICES, poidsKg, estimateCaloriesSeance };
+}
+
+// Recalcule durée / calories / muscles d'une séance à partir de ses séries,
+// seule trace horodatée fiable de l'effort. Renvoie null si rien à en tirer.
+async function _recomputeFromSeries(id, { EXERCICES, poidsKg, estimateCaloriesSeance }) {
+  const { data: series } = await supabase
+    .from('series')
+    .select('exercice_nom, poids_kg, repetitions, duree_s, vitesse_kmh, created_at')
+    .eq('seance_id', id)
+    .order('created_at', { ascending: true });
+
+  if (!series?.length) return null; // séance sans série → rien à récupérer
+
+  // Durée : intervalle entre la première et la dernière série
+  const firstMs = new Date(series[0].created_at).getTime();
+  const lastMs  = new Date(series.at(-1).created_at).getTime();
+  const dureeMinutes = Math.max(1, Math.round((lastMs - firstMs) / 60000));
+
+  // Muscles : depuis la bibliothèque d'exercices
+  const seenNoms     = [...new Set(series.map(s => s.exercice_nom))];
+  const muscleCounts = new Map();
+  for (const nom of seenNoms) {
+    const exo = EXERCICES.find(e => e.nom === nom);
+    for (const m of exo?.muscles ?? []) muscleCounts.set(m, (muscleCounts.get(m) ?? 0) + 1);
+  }
+  const muscles = [...muscleCounts.entries()].sort((a, b) => b[1] - a[1]).map(([m]) => m);
+
+  // Calories : même formule que estimateCaloriesSeance
+  const exercices = seenNoms.map(nom => {
+    const exo = EXERCICES.find(e => e.nom === nom);
+    return {
+      type_metrique: exo?.type_metrique ?? 'kg_reps',
+      sets: series.filter(s => s.exercice_nom === nom).map(() => ({ done: true })),
+    };
+  });
+  const calories = estimateCaloriesSeance(exercices, dureeMinutes, poidsKg);
+
+  return { dureeMinutes, calories, muscles };
+}
+
 async function _repairIncompleteSessions() {
   try {
     const { data: incomplete } = await supabase
@@ -61,59 +117,83 @@ async function _repairIncompleteSessions() {
 
     if (!incomplete?.length) return 0;
 
-    const [{ getAllExercices }, { getPoidsActuel }, { estimateCaloriesSeance }] = await Promise.all([
-      import('./exercices.js'),
-      import('./profil.js'),
-      import('../js/calories.js'),
-    ]);
-
-    const [EXERCICES, poidsKg] = await Promise.all([getAllExercices(), getPoidsActuel()]);
-
+    const ctx = await _repairContext();
     let count = 0;
 
     for (const { id } of incomplete) {
-      const { data: series } = await supabase
-        .from('series')
-        .select('exercice_nom, poids_kg, repetitions, duree_s, vitesse_kmh, created_at')
-        .eq('seance_id', id)
-        .order('created_at', { ascending: true });
-
-      if (!series?.length) continue; // séance sans série → rien à récupérer
-
-      // Durée : intervalle entre la première et la dernière série
-      const firstMs = new Date(series[0].created_at).getTime();
-      const lastMs  = new Date(series.at(-1).created_at).getTime();
-      const dureeMinutes = Math.max(1, Math.round((lastMs - firstMs) / 60000));
-
-      // Muscles : depuis la bibliothèque d'exercices
-      const seenNoms   = [...new Set(series.map(s => s.exercice_nom))];
-      const muscleCounts = new Map();
-      for (const nom of seenNoms) {
-        const exo = EXERCICES.find(e => e.nom === nom);
-        for (const m of exo?.muscles ?? []) muscleCounts.set(m, (muscleCounts.get(m) ?? 0) + 1);
-      }
-      const muscles = [...muscleCounts.entries()].sort((a, b) => b[1] - a[1]).map(([m]) => m);
-
-      // Calories : même formule que estimateCaloriesSeance
-      const exercices = seenNoms.map(nom => {
-        const exo = EXERCICES.find(e => e.nom === nom);
-        return {
-          type_metrique: exo?.type_metrique ?? 'kg_reps',
-          sets: series.filter(s => s.exercice_nom === nom).map(() => ({ done: true })),
-        };
-      });
-      const calories = estimateCaloriesSeance(exercices, dureeMinutes, poidsKg);
+      const fixed = await _recomputeFromSeries(id, ctx);
+      if (!fixed) continue;
 
       await supabase.from('seances').update({
-        duree_minutes:      dureeMinutes,
-        calories_estimees:  calories,
-        muscles_travailles: muscles.length ? muscles : null,
+        duree_minutes:      fixed.dureeMinutes,
+        calories_estimees:  fixed.calories,
+        muscles_travailles: fixed.muscles.length ? fixed.muscles : null,
       }).eq('id', id);
 
       count++;
     }
 
     return count;
+  } catch {
+    return 0;
+  }
+}
+
+// ── Séances aux durées aberrantes ────────────────────────────────────
+// Avant le bornage de la durée à la clôture, une séance reprise après une
+// coupure de l'appli enregistrait le chrono mural complet (parfois plusieurs
+// jours) — et des calories proportionnelles tout aussi absurdes. On les
+// recalcule depuis les séries, mais jamais en silence : c'est de
+// l'historique d'entraînement, l'utilisateur valide avant écrasement.
+
+async function _repairAberrantSessions() {
+  try {
+    const { data: suspectes } = await supabase
+      .from('seances')
+      .select('id, nom, date, duree_minutes, calories_estimees')
+      .eq('user_id', currentUser.id)
+      .gt('duree_minutes', _ABERRANT_DUREE_MIN)
+      .order('date', { ascending: false });
+
+    if (!suspectes?.length) return 0;
+
+    const ctx = await _repairContext();
+    const corrections = [];
+
+    for (const s of suspectes) {
+      const fixed = await _recomputeFromSeries(s.id, ctx);
+      if (!fixed) continue;
+      // Une séance réellement longue (les séries s'étalent vraiment sur cette
+      // durée) reste intacte : on ne corrige que l'écart inexplicable.
+      if (s.duree_minutes <= fixed.dureeMinutes + MAX_OVERHEAD_MIN) continue;
+      corrections.push({ seance: s, fixed });
+    }
+
+    if (!corrections.length) return 0;
+
+    const lignes = corrections.map(({ seance, fixed }) =>
+      `<li style="margin-top:4px">${escapeHtml(seance.nom || 'Séance')} — ${formatDate(seance.date)} :
+       <b>${formatDuration(seance.duree_minutes)}</b> → <b>${formatDuration(fixed.dureeMinutes)}</b></li>`
+    ).join('');
+
+    const ok = await confirmDialog(
+      `${corrections.length} séance${corrections.length > 1 ? 's ont' : ' a'} une durée incohérente,
+       probablement à cause d'une coupure de l'appli en cours de séance.
+       Recalculer depuis l'horodatage réel des séries ?
+       <ul style="margin-top:8px;padding-left:18px">${lignes}</ul>`,
+      { title: 'Durées incohérentes', confirmLabel: 'Corriger', cancelLabel: 'Laisser tel quel', danger: false }
+    );
+    if (!ok) return 0;
+
+    for (const { seance, fixed } of corrections) {
+      await supabase.from('seances').update({
+        duree_minutes:      fixed.dureeMinutes,
+        calories_estimees:  fixed.calories,
+        muscles_travailles: fixed.muscles.length ? fixed.muscles : null,
+      }).eq('id', seance.id);
+    }
+
+    return corrections.length;
   } catch {
     return 0;
   }

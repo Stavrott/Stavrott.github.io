@@ -25,6 +25,11 @@ const _setTimers = new Map(); // timers actifs par série, clé `${ei}_${si}`
 
 const _PERSIST_KEY = 'forme_active_seance';
 
+// Au-delà de ce délai depuis le début, une séance encore "active" en
+// localStorage n'a pas duré tout ce temps : l'appli a été coupée en cours
+// de route. Le chrono doit alors être réancré, pas repris tel quel.
+const _STALE_SEANCE_MS = 12 * 60 * 60 * 1000; // 12 h
+
 function _persistState() {
   if (!_state || !_startTime) return;
   try {
@@ -65,6 +70,25 @@ export async function tryRestoreSeance() {
       exercices:           saved.exercices ?? [],
     };
     _startTime = saved.startTime;
+
+    // Séance reprise longtemps après le début : le chrono mural afficherait
+    // "14:32:07" pour une séance d'une heure faite la veille. On le réancre
+    // sur le temps de travail réellement horodaté (première → dernière
+    // série), qui repart de là et continue de tourner normalement.
+    if (Date.now() - saved.startTime > _STALE_SEANCE_MS) {
+      const { data: series } = await supabase
+        .from('series')
+        .select('created_at')
+        .eq('seance_id', saved.seanceId)
+        .order('created_at', { ascending: true });
+
+      const spanMs = series?.length
+        ? new Date(series.at(-1).created_at).getTime() - new Date(series[0].created_at).getTime()
+        : 0;
+      _startTime = Date.now() - spanMs;
+      _persistState();
+    }
+
     _lastActiveExoIndex = null;
     return true;
   } catch {
@@ -190,6 +214,38 @@ function _tickElapsed() {
 }
 
 function _elapsedMinutes() { return Math.max(1, Math.round((Date.now() - _startTime) / 60000)); }
+
+// Marge de "hors-série" tolérée : échauffement avant la première série,
+// puis repos final et rangement après la dernière. Au-delà, le chrono mural
+// n'est plus crédible — appli fermée brutalement puis rouverte le lendemain,
+// onglet suspendu, téléphone qui tue la PWA — et on retombe sur l'intervalle
+// réel des séries, seule trace horodatée de l'effort.
+export const MAX_OVERHEAD_MIN = 30;
+
+// Durée réelle de la séance, bornée par l'intervalle des séries en DB.
+// Le chrono seul produisait des durées (et donc des calories, linéaires en
+// durée) délirantes dès qu'une séance était reprise après une coupure.
+async function _realDurationMinutes() {
+  const chrono = _elapsedMinutes();
+  try {
+    const { data } = await supabase
+      .from('series')
+      .select('created_at')
+      .eq('seance_id', _state.seance.id)
+      .order('created_at', { ascending: true });
+
+    if (!data?.length) return Math.min(chrono, MAX_OVERHEAD_MIN);
+
+    const spanMin = Math.round(
+      (new Date(data.at(-1).created_at).getTime() - new Date(data[0].created_at).getTime()) / 60000
+    );
+    return Math.max(1, Math.min(chrono, spanMin + MAX_OVERHEAD_MIN));
+  } catch {
+    // Hors-ligne : on garde le chrono, _repairAberrantSessions corrigera au
+    // prochain chargement de la page Séances si la valeur est incohérente.
+    return chrono;
+  }
+}
 
 // ── Regroupement en blocs single / superset ────────────────────────────
 // Un superset chaîne N exercices consécutifs (repos_inter === null sur
@@ -1201,7 +1257,6 @@ export async function openExercicePicker(replaceEi = null) {
 async function _confirmFinish() {
   if (!_state) return;
   const totalSets = _state.exercices.reduce((n, e) => n + e.sets.filter(s => s.done).length, 0);
-  const duree     = _elapsedMinutes();
 
   if (!_state.exercices.length) {
     if (await confirmDialog('Aucun exercice enregistré. Annuler la séance ?', { confirmLabel: 'Annuler la séance' })) {
@@ -1216,6 +1271,8 @@ async function _confirmFinish() {
   // page, ou raccourci poubelle de la barre flottante), donc un tap
   // accidentel ne doit jamais suffire à elle seul.
   if (!await confirmDialog('Voulez-vous vraiment terminer cette séance ?', { confirmLabel: 'Terminer', danger: false })) return;
+
+  const duree = await _realDurationMinutes();
 
   const doneNoms = new Set(_state.exercices.filter(e => e.sets.some(s => s.done)).map(e => e.nom));
   const missingFromRoutine = (_state.routineExerciceNoms ?? []).filter(nom => !doneNoms.has(nom));
