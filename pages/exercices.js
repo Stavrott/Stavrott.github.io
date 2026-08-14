@@ -3,6 +3,7 @@ import { supabase }      from '../js/supabase.js';
 import { debounce, openModal, closeModal, showToast, showLoading, hideLoading, emptyState,
          calc1RM, formatDate, todayStr, lsGet, lsSet, svgLineChart, confirmDialog } from '../js/utils.js';
 import { fetchExerciseImage, fetchExerciseImages } from '../js/exercisedb.js';
+import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 import { METRIC_TYPES, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
 
 // ── Bibliothèque intégrée ─────────────────────────────────────────────
@@ -82,6 +83,9 @@ export const EXERCICES = [
   { nom: 'Rowing haltère unilatéral', groupe: 'Dos', materiel: 'Haltères', niveau: 'Débutant',
     muscles: ['Grand dorsal', 'Rhomboïdes', 'Biceps'],
     description: 'Un genou et une main sur le banc, tirez l\'haltère vers la hanche. Excellent pour corriger les déséquilibres gauche/droite.' },
+  { nom: 'Tirage banc incliné', groupe: 'Dos', materiel: 'Haltères', niveau: 'Débutant',
+    muscles: ['Trapèzes', 'Rhomboïdes', 'Grand dorsal', 'Deltoïdes postérieurs', 'Biceps'],
+    description: 'Allongé sur le ventre sur un banc incliné, un haltère dans chaque main bras tendus. Tirez les haltères vers les hanches en serrant les omoplates, puis redescendez lentement. Le buste étant calé, impossible de tricher avec un à-coup de reins : tout le travail reste sur le haut du dos.' },
   { nom: 'Tirage vertical barre large', groupe: 'Dos', materiel: 'Câble', niveau: 'Débutant',
     muscles: ['Grand dorsal', 'Biceps', 'Rhomboïdes'],
     description: 'Assis à la machine de tirage, prise large pronation. Tirez la barre vers le haut de la poitrine en écartant les coudes.' },
@@ -521,6 +525,10 @@ function _loadListImages(container) {
 
 // ── Détail exercice ───────────────────────────────────────────────────
 
+// bodyMapHTML() préfixe les id des zones SVG avec cet identifiant : deux
+// cartes affichées en même temps dans le DOM se voleraient leurs id sinon.
+const _DETAIL_MAP_UID = 'exo-detail';
+
 export function openExoDetail(exo) {
   openModal({
     title: exo.nom,
@@ -552,6 +560,9 @@ export function openExoDetail(exo) {
           <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
             ${exo.muscles.map(m => `<span class="muscle-tag">${m}</span>`).join('')}
           </div>
+          <div style="margin-top:var(--space-3)">
+            ${bodyMapHTML(_DETAIL_MAP_UID)}
+          </div>
         </div>` : ''}
 
         <!-- Description -->
@@ -573,6 +584,9 @@ export function openExoDetail(exo) {
         </div>
       </div>`,
   });
+
+  highlightMuscles(document.getElementById('modal-body'),
+                   groupsFromMuscleNames(exo.muscles), _DETAIL_MAP_UID);
 
   setTimeout(() => _loadGif(exo), 80);
   setTimeout(() => _loadProgression(exo), 80);

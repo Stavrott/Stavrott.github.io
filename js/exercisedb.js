@@ -35,6 +35,7 @@ const IMG_MAP = {
   'Tractions prise serrée':                   'Chin-Up',
   'Rowing barre':                             'Bent_Over_Barbell_Row',
   'Rowing haltère unilatéral':                'One-Arm_Dumbbell_Row',
+  'Tirage banc incliné':                      'Dumbbell_Incline_Row',
   'Tirage vertical barre large':              'Wide-Grip_Lat_Pulldown',
   'Tirage vertical prise neutre':             'Close-Grip_Front_Lat_Pulldown',
   'Tirage horizontal câble':                  'Seated_Cable_Rows',
