@@ -436,10 +436,21 @@ async function _initDiag() {
   if (param === '0') lsSet('diag', false);
   if (!lsGet('diag')) return;
 
+  // État du contexte courant : sur Android, une PWA installée (WebAPK) a sa
+  // propre autorisation de notifications, distincte de celle de l'onglet
+  // Chrome du même site. Sans ces deux lignes, on ne sait pas dans lequel
+  // des deux on vient de lire le journal — ni pourquoi il est vide.
+  let contexte = `perm=${('Notification' in window) ? Notification.permission : 'absent'}`;
+  contexte += window.matchMedia('(display-mode: standalone)').matches ? ' · PWA' : ' · onglet';
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    contexte += (await reg.pushManager.getSubscription()) ? ' · abonné' : ' · NON abonné';
+  } catch { contexte += ' · SW indisponible'; }
+
   try {
     const reponse = await caches.open('forme-diag').then((c) => c.match('/diag'));
     if (!reponse) {
-      showToast('Diag : aucun push reçu par le service worker', 'warning', 10000);
+      showToast(`Diag [${contexte}] : aucun push reçu par le service worker`, 'warning', 15000);
       return;
     }
     const [dernier] = await reponse.json();
@@ -448,9 +459,9 @@ async function _initDiag() {
       ? dernier.fenetres.map((f) => `${f.vis}${f.focus ? '/actif' : ''}`).join(' + ')
       : 'aucune fenêtre';
     showToast(
-      `Diag ${heure} — ${dernier.etat}${dernier.erreur ? ' (' + dernier.erreur + ')' : ''} · ` +
+      `Diag [${contexte}] ${heure} — ${dernier.etat}${dernier.erreur ? ' (' + dernier.erreur + ')' : ''} · ` +
       `fenêtres : ${fenetres} · notifs : ${dernier.tags.join(',') || 'aucune'}`,
-      dernier.etat === 'affichee' ? 'success' : 'error', 15000);
+      dernier.etat === 'affichee' ? 'success' : 'error', 20000);
   } catch { /* le diagnostic ne doit jamais empêcher l'app de démarrer */ }
 }
 
