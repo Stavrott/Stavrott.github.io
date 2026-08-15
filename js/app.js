@@ -423,10 +423,42 @@ function _onLoggedIn(user) {
   }
 }
 
+// ── Journal de diagnostic des notifications (temporaire) ──────────────
+// S'active une fois en ouvrant l'app avec ?diag=1, se désactive avec
+// ?diag=0. Tant qu'il est inactif — c'est-à-dire pour tout le monde sauf
+// celui qui l'a demandé — cette fonction ne fait rien du tout.
+// Affiche ce que le service worker a consigné lors des derniers push reçus
+// (voir _diagLog dans service-worker.js). À retirer une fois le problème
+// de notification en arrière-plan tranché.
+async function _initDiag() {
+  const param = new URL(location.href).searchParams.get('diag');
+  if (param === '1') lsSet('diag', true);
+  if (param === '0') lsSet('diag', false);
+  if (!lsGet('diag')) return;
+
+  try {
+    const reponse = await caches.open('forme-diag').then((c) => c.match('/diag'));
+    if (!reponse) {
+      showToast('Diag : aucun push reçu par le service worker', 'warning', 10000);
+      return;
+    }
+    const [dernier] = await reponse.json();
+    const heure = new Date(dernier.t).toLocaleTimeString('fr-FR');
+    const fenetres = dernier.fenetres.length
+      ? dernier.fenetres.map((f) => `${f.vis}${f.focus ? '/actif' : ''}`).join(' + ')
+      : 'aucune fenêtre';
+    showToast(
+      `Diag ${heure} — ${dernier.etat}${dernier.erreur ? ' (' + dernier.erreur + ')' : ''} · ` +
+      `fenêtres : ${fenetres} · notifs : ${dernier.tags.join(',') || 'aucune'}`,
+      dernier.etat === 'affichee' ? 'success' : 'error', 15000);
+  } catch { /* le diagnostic ne doit jamais empêcher l'app de démarrer */ }
+}
+
 async function boot() {
   initTheme();
   initAuthUI();
   _initDemoButton();
+  _initDiag();
 
   await initAuth(_onLoggedIn, showAuth);
 

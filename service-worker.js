@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v31';
+const CACHE_NAME = 'forme-v32';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -50,6 +50,26 @@ self.addEventListener('install', (event) => {
 // Notification push reçue depuis le serveur (send-due-notifications) —
 // fonctionne même si l'app/onglet est complètement fermé, contrairement
 // aux notifications locales déclenchées depuis components/timer.js.
+// ── Journal de diagnostic (temporaire) ─────────────────────────────────
+// Le service worker n'a ni console ni logs accessibles depuis un téléphone.
+// On consigne donc chaque push reçu dans un cache dédié, que la page relit
+// au lancement suivant pour l'afficher (voir _initDiag dans js/app.js).
+// Objectif : savoir si le push atteint seulement le service worker quand
+// l'app est en arrière-plan écran allumé, ou s'il l'atteint sans alerter.
+// À retirer une fois la question tranchée.
+const DIAG_CACHE = 'forme-diag';
+
+async function _diagLog(entree) {
+  try {
+    const c = await caches.open(DIAG_CACHE);
+    const precedent = await c.match('/diag').then((r) => (r ? r.json() : [])).catch(() => []);
+    const liste = [entree, ...(Array.isArray(precedent) ? precedent : [])].slice(0, 10);
+    await c.put('/diag', new Response(JSON.stringify(liste), {
+      headers: { 'Content-Type': 'application/json' },
+    }));
+  } catch { /* le diagnostic ne doit jamais casser la notification */ }
+}
+
 // Deux garde-fous contre le même piège : une notification qui en remplace
 // une autre de même tag n'alerte pas — ni son, ni vibration — sauf si
 // `renotify` vaut true. La notification de fin de repos a donc son propre
@@ -82,6 +102,22 @@ self.addEventListener('push', (event) => {
       // notification éphémère.)
       requireInteraction: data.requireInteraction ?? true,
       timestamp: Date.now(),
+    }).then(
+      () => ['affichee', null],
+      (e) => ['echec', String(e).slice(0, 200)],
+    ).then(async ([etat, erreur]) => {
+      // L'état des fenêtres ouvertes est la mesure qui manque : elle dit si
+      // la page était encore vivante (et donc en train de réécrire ses
+      // propres notifications) au moment où le push est arrivé.
+      const fenetres = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const affichees = await self.registration.getNotifications();
+      await _diagLog({
+        t: new Date().toISOString(),
+        etat,
+        erreur,
+        fenetres: fenetres.map((c) => ({ vis: c.visibilityState, focus: c.focused })),
+        tags: affichees.map((n) => n.tag),
+      });
     });
   })());
 });
@@ -107,7 +143,9 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys
+        .filter((k) => k !== CACHE_NAME && k !== DIAG_CACHE)
+        .map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
