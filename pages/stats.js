@@ -143,8 +143,7 @@ function _frequencyBars(seances) {
       <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
         <div style="width:100%;height:${h || 4}px;
           background:${counts[i] > 0 ? 'var(--color-primary)' : 'var(--surface-3)'};
-          border-radius:4px;transition:height .3s;
-          ${counts[i] > 0 ? 'box-shadow:0 2px 6px rgba(201, 163, 92,.3)' : ''}"></div>
+          border-radius:4px;transition:height .3s"></div>
         <span style="font-size:9px;color:${today ? 'var(--color-primary)' : 'var(--text-muted)'};
           font-weight:${today ? 700 : 500}">${label}</span>
       </div>`;

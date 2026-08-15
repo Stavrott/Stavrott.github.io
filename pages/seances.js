@@ -370,7 +370,6 @@ function _calendarHTML(viewDate, seances) {
         border:${isToday && !isDone ? '2px solid var(--color-primary)' : '2px solid transparent'};
         cursor:${isDone ? 'pointer' : 'default'};
         transition:opacity var(--transition-fast);
-        ${isDone ? 'box-shadow:0 2px 8px rgba(201, 163, 92,0.35)' : ''}
       " ${isDone ? `title="Séance enregistrée"` : ''}>
         ${d}
       </div>`;
@@ -493,8 +492,7 @@ async function _renderVolume(section) {
               <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
                 ${w.volume > 0 ? `<span style="font-size:9px;color:var(--text-muted);font-weight:700">${w.volume >= 1000 ? (w.volume/1000).toFixed(1)+'t' : w.volume+'kg'}</span>` : '<span></span>'}
                 <div style="width:100%;height:${h}%;background:${isLast ? 'var(--color-primary)' : 'var(--surface-3)'};
-                  border-radius:4px 4px 2px 2px;min-height:3px;transition:height .4s;
-                  ${isLast ? 'box-shadow:0 2px 8px rgba(201, 163, 92,.35)' : ''}"></div>
+                  border-radius:4px 4px 2px 2px;min-height:3px;transition:height .4s"></div>
                 <span style="font-size:9px;color:${isLast ? 'var(--color-primary)' : 'var(--text-muted)'};font-weight:${isLast ? 700 : 400}">${w.label}</span>
               </div>`;
           }).join('')}
