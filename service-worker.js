@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v33';
+const CACHE_NAME = 'forme-v34';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -87,12 +87,20 @@ self.addEventListener('push', (event) => {
     // passage pour ne pas laisser deux notifications côte à côte.
     (await self.registration.getNotifications({ tag: 'timer-rest' })).forEach((n) => n.close());
 
+    // Les deux chemins — minuteur local et push serveur — peuvent aboutir
+    // pour un même repos, à quelques secondes d'écart. Le premier arrivé
+    // alerte ; le second se contente de mettre la notification à jour, sans
+    // refaire sonner le téléphone.
+    const tagFin = data.tag ?? 'timer-rest-done';
+    const dejaAffichee = (await self.registration.getNotifications({ tag: tagFin })).length > 0;
+
     await self.registration.showNotification(data.title, {
       body: data.body,
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
-      tag: data.tag ?? 'timer-rest-done',
-      renotify: data.renotify ?? true,
+      tag: tagFin,
+      renotify: dejaAffichee ? false : (data.renotify ?? true),
+      silent: dejaAffichee,
       // Même motif que la notification locale de fin de repos, pour que
       // les deux chemins se ressentent pareil au poignet comme en poche.
       vibrate: data.vibrate ?? [150, 80, 150],

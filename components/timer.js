@@ -78,7 +78,12 @@ function tick() {
     // fin du repos) plutôt que de rester ouverte en attendant un tap sur
     // "passer le repos". `token` évite de fermer un timer relancé depuis.
     const token = runToken;
-    setTimeout(() => { if (runToken === token) hideTimer(); }, 1200);
+    // `annulerPush: false` est essentiel : le repos vient d'arriver à son
+    // terme, donc la notification serveur est précisément celle qu'on
+    // attend. L'annuler ici coupait le filet de sécurité au pire moment —
+    // quand la page vit encore en arrière-plan et que ses propres alertes
+    // (son, vibration) sont inertes, il ne restait plus rien pour prévenir.
+    setTimeout(() => { if (runToken === token) hideTimer({ annulerPush: false }); }, 1200);
     return;
   }
   updateDisplay();
@@ -331,12 +336,15 @@ function _reschedulePush(newRemaining) {
     .then(id => { pendingPushId = id; });
 }
 
-export function hideTimer() {
+// Le push serveur n'est annulé que si le repos est écourté — bouton
+// « Passer », action de la notification, ou fin de séance. Jamais quand il
+// arrive à son terme : c'est là qu'il doit sonner.
+export function hideTimer({ annulerPush = true } = {}) {
   runToken++;
   stop();
   minimized = false;
   overlay()?.classList.add('hidden');
-  cancelRestPush(pendingPushId);
+  if (annulerPush) cancelRestPush(pendingPushId);
   pendingPushId = null;
 }
 
@@ -371,7 +379,9 @@ export function initTimer() {
   document.getElementById('timer-plus')?.addEventListener('click',  () => adjust(+15));
 
   // Passer le repos — arrêt complet, contrairement à minimiser
-  document.getElementById('timer-skip')?.addEventListener('click', hideTimer);
+  // Enveloppé plutôt que passé directement : sinon l'objet Event servirait
+  // d'options à hideTimer.
+  document.getElementById('timer-skip')?.addEventListener('click', () => hideTimer());
 
   // Minimiser : tap sur la poignée, glisser la poignée vers le bas, ou tap sur le fond
   document.getElementById('timer-minimize')?.addEventListener('click', minimize);
