@@ -205,14 +205,23 @@ function _beep() {
 // montre connectée : les notifs du téléphone s'y reflètent automatiquement
 // via l'OS, boutons inclus, sans rien construire de natif.
 
-function _showNotification(title, body, actions, { silent = false, renotify = true, requireInteraction = false } = {}) {
+// Deux tags distincts, et c'est essentiel : le décompte est réécrit toutes
+// les 5 s en silencieux tant que la page tourne. Si la notification de fin
+// portait le même tag, elle ne serait qu'un remplacement de plus — et un
+// remplacement n'alerte pas de façon fiable. C'est ce qui faisait qu'elle
+// sonnait écran éteint (page suspendue, plus de réécriture) mais pas quand
+// l'app était simplement en arrière-plan, téléphone allumé.
+const TAG_REPOS = 'timer-rest';
+const TAG_FIN   = 'timer-rest-done';
+
+function _showNotification(title, body, actions, { silent = false, renotify = true, requireInteraction = false, tag = TAG_REPOS } = {}) {
   if (!('Notification' in window) || Notification.permission !== 'granted' || !('serviceWorker' in navigator)) return;
   navigator.serviceWorker.ready.then(reg => {
     reg.showNotification(title, {
       body,
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
-      tag: 'timer-rest',
+      tag,
       renotify,
       silent,
       requireInteraction,
@@ -253,13 +262,24 @@ function _maybeRefreshNotification() {
   _showNotification('Forme — Repos en cours', `${formatTime(remaining)} restant`, REST_LABEL, { silent: true, renotify: false });
 }
 
-// Même traitement que la notification poussée par le serveur : elle sonne,
-// vibre, et reste affichée jusqu'à ce qu'on la balaie.
-function _notifyEnd() {
+// Filet de sécurité local, doublé par le push serveur. Les deux peuvent
+// arriver à quelques secondes d'écart (les minuteurs de la page sont
+// bridés en arrière-plan, le push est à l'heure) : on vérifie donc si la
+// notification de fin est déjà affichée avant d'en émettre une seconde,
+// pour ne pas faire sonner le téléphone deux fois pour le même repos.
+async function _notifyEnd() {
   _beep();
-  _showNotification('Forme — Repos terminé !', 'C\'est l\'heure de votre prochaine série', [],
-    { requireInteraction: true });
   if ('vibrate' in navigator) navigator.vibrate([150, 80, 150]);
+
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    // Le décompte n'a plus lieu d'être affiché à côté de « terminé ».
+    (await reg.getNotifications({ tag: TAG_REPOS })).forEach(n => n.close());
+    if ((await reg.getNotifications({ tag: TAG_FIN })).length) return; // le push a déjà alerté
+  } catch {}
+
+  _showNotification('Forme — Repos terminé !', 'C\'est l\'heure de votre prochaine série', [],
+    { requireInteraction: true, tag: TAG_FIN });
 }
 
 // Réagit aux boutons d'action tapés sur la notification (relayés par le
