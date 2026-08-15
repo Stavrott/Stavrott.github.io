@@ -6,8 +6,28 @@ import * as webpush from 'jsr:@negrel/webpush';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const VAPID_PUBLIC_JWK = JSON.parse(Deno.env.get('VAPID_PUBLIC_JWK')!);
-const VAPID_PRIVATE_JWK = JSON.parse(Deno.env.get('VAPID_PRIVATE_JWK')!);
+
+// Ces deux secrets étaient lus avec `JSON.parse(...!)` directement : s'ils
+// manquent, le module échoue au chargement, la fonction répond 500 à chaque
+// appel, et pg_cron — qui poste sans jamais lire la réponse — n'en dit rien.
+// Résultat : aucune notification n'part et rien ne le signale nulle part.
+function _jwtRequis(nom: string) {
+  const brut = Deno.env.get(nom);
+  if (!brut) {
+    console.error(`[push] secret manquant : ${nom} — aucune notification ne peut être signée. ` +
+      `À définir avec : supabase secrets set ${nom}='{...}'`);
+    throw new Error(`Secret ${nom} absent`);
+  }
+  try {
+    return JSON.parse(brut);
+  } catch {
+    console.error(`[push] secret ${nom} illisible : ce doit être un JWK au format JSON.`);
+    throw new Error(`Secret ${nom} invalide`);
+  }
+}
+
+const VAPID_PUBLIC_JWK = _jwtRequis('VAPID_PUBLIC_JWK');
+const VAPID_PRIVATE_JWK = _jwtRequis('VAPID_PRIVATE_JWK');
 const CONTACT_EMAIL = Deno.env.get('VAPID_CONTACT_EMAIL') || 'mailto:contact@example.com';
 
 const STEP_MS = 1_000;
@@ -33,19 +53,36 @@ async function sendDue(admin: ReturnType<typeof createClient>, appServer: webpus
       .select('id, endpoint, p256dh, auth_key')
       .eq('user_id', notif.user_id);
 
+    if (!subs?.length) {
+      console.warn(`[push] notif ${notif.id} : aucun abonnement pour l utilisateur ${notif.user_id}`);
+    }
+
     for (const sub of subs ?? []) {
+      const hote = (() => { try { return new URL(sub.endpoint).host; } catch { return '?'; } })();
       try {
         const subscriber = appServer.subscribe({
           endpoint: sub.endpoint,
           keys: { p256dh: sub.p256dh, auth: sub.auth_key },
         });
         await subscriber.pushTextMessage(JSON.stringify({ title: notif.title, body: notif.body }), {});
+        console.info(`[push] envoyé -> ${hote} (notif ${notif.id})`);
       } catch (e) {
+        const msg = String(e);
+        // Sans cette trace, un échec de livraison était totalement muet :
+        // la ligne push_pending est marquée envoyée avant la tentative (pour
+        // éviter les renvois en boucle), donc rien nulle part n indiquait que
+        // la notification n était jamais partie. Un 403 signale typiquement
+        // des clés VAPID côté serveur qui ne correspondent pas à la clé
+        // publique utilisée par le client pour s abonner.
+        console.error(`[push] ÉCHEC -> ${hote} (notif ${notif.id}) : ${msg}`);
+        if (msg.includes('403') || msg.includes('VapidPkHashMismatch')) {
+          console.error('[push] 403 : les clés VAPID du serveur ne correspondent pas à VAPID_PUBLIC_KEY de js/config.js — les abonnements existants doivent être recréés après correction.');
+        }
         // Abonnement expiré/invalide (410 Gone typiquement) — on le supprime
         // pour ne pas réessayer indéfiniment sur un appareil désinstallé.
-        const msg = String(e);
         if (msg.includes('410') || msg.includes('404')) {
           await admin.from('push_subscriptions').delete().eq('id', sub.id);
+          console.warn(`[push] abonnement ${sub.id} supprimé (expiré)`);
         }
       }
     }
