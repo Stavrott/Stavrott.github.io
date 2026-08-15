@@ -388,7 +388,7 @@
   border-bottom: 1px solid var(--border);
 }
 .set-row:last-child { border-bottom: none; }
-.set-row.set-done  { background: rgba(201, 163, 92, 0.04); }
+.set-row.set-done  { background: var(--color-validated-light); }
 
 .set-num {
   width: 28px; height: 28px; border-radius: var(--radius-full);
@@ -397,9 +397,12 @@
   font-size: 11px; font-weight: 800; color: var(--text-muted);
   flex-shrink: 0; transition: all var(--transition-fast);
 }
+/* Validé ≠ marque : le vert dit « c'est fait », l'or reste réservé aux
+   actions. C'est l'information la plus fréquente de l'écran, elle mérite
+   son propre signal. */
 .set-num.set-num-done {
-  background: var(--color-primary-grad); border-color: transparent;
-  color: white; box-shadow: var(--shadow-accent-sm);
+  background: var(--color-validated); border-color: transparent;
+  color: var(--color-validated-ink); box-shadow: none;
 }
 
 /* La pastille est cliquable : elle ouvre le choix du type de série. */
@@ -425,6 +428,7 @@ button.set-num:active { transform: scale(0.88); }
 .set-prev {
   flex: 1; font-size: 11px; font-weight: 600; color: var(--text-muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 
 .set-input {
@@ -433,6 +437,9 @@ button.set-num:active { transform: scale(0.88); }
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-1);
   font-size: var(--font-size-md); font-weight: 800; color: var(--text-primary);
+  /* Chiffres de largeur fixe : les colonnes kg / reps s'alignent d'une
+     ligne de série à l'autre, ce qui rend la carte lisible en diagonale. */
+  font-variant-numeric: tabular-nums;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
   flex-shrink: 0; -moz-appearance: textfield;
 }
@@ -509,13 +516,13 @@ button.set-num:active { transform: scale(0.88); }
 }
 .set-check svg { width: 15px; height: 15px; }
 .set-check:hover {
-  border-color: var(--color-primary); color: var(--color-primary);
-  background: var(--color-primary-light); transform: scale(1.10);
+  border-color: var(--color-validated); color: var(--color-validated);
+  background: var(--color-validated-light); transform: scale(1.10);
 }
 .set-check:active { transform: scale(0.88); }
 .set-check.set-check-done {
-  background: var(--color-primary-grad); border-color: transparent;
-  color: white; box-shadow: var(--shadow-accent-sm);
+  background: var(--color-validated); border-color: transparent;
+  color: var(--color-validated-ink); box-shadow: none;
 }
 
 .btn-add-serie {
@@ -782,9 +789,9 @@ button.set-num:active { transform: scale(0.88); }
 }
 
 .week-dot-circle.done {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  box-shadow: 0 2px 8px var(--color-primary-glow-s);
+  background: var(--color-validated);
+  border-color: var(--color-validated);
+  box-shadow: none;
 }
 
 .week-dot-circle.done svg {

@@ -58,21 +58,20 @@ function _rgba(hex, a) {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
+// L'accent est appliqué en aplat : ni dégradé, ni halo coloré. Les jetons
+// de lueur et d'ombre accent ne sont volontairement plus écrits ici — ils
+// gardent la valeur neutre définie dans css/variables.css. Les écraser
+// avec des valeurs teintées annulerait la refonte à chaque changement de
+// couleur, puisque les styles en ligne l'emportent sur la feuille.
 function applyAccent(hex) {
   const root  = document.documentElement.style;
-  const dark  = _mixHex(hex, '#000000', 0.32);
   const hover = _mixHex(hex, '#000000', 0.18);
-  const light = _mixHex(hex, '#ffffff', 0.14);
 
   root.setProperty('--color-primary',       hex);
   root.setProperty('--color-primary-hover', hover);
   root.setProperty('--color-primary-light', _rgba(hex, 0.12));
-  root.setProperty('--color-primary-glow',  _rgba(hex, 0.50));
-  root.setProperty('--color-primary-glow-s',_rgba(hex, 0.25));
-  root.setProperty('--color-primary-grad',  `linear-gradient(135deg, ${dark} 0%, ${hex} 48%, ${light} 100%)`);
-  root.setProperty('--color-primary-grad-v',`linear-gradient(180deg, ${dark} 0%, ${hex} 55%, ${light} 100%)`);
-  root.setProperty('--shadow-accent',       `0 8px 32px ${_rgba(hex, 0.50)}`);
-  root.setProperty('--shadow-accent-sm',    `0 4px 16px ${_rgba(hex, 0.38)}`);
+  root.setProperty('--color-primary-grad',  hex);
+  root.setProperty('--color-primary-grad-v',hex);
   root.setProperty('--border-focus',        _rgba(hex, 0.58));
   root.setProperty('--border-ember',        _rgba(hex, 0.26));
   root.setProperty('--chart-line',          hex);
