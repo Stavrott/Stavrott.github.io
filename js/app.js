@@ -447,6 +447,14 @@ async function _initDiag() {
     contexte += (await reg.pushManager.getSubscription()) ? ' · abonné' : ' · NON abonné';
   } catch { contexte += ' · SW indisponible'; }
 
+  // Version réellement active sur cet appareil. Sans ça, impossible de
+  // distinguer « le correctif ne marche pas » de « le téléphone tourne
+  // encore sur l'ancien service worker », qui produisent le même symptôme.
+  try {
+    const version = (await caches.keys()).find((k) => /^forme-v\d+$/.test(k));
+    contexte += ` · ${version ?? 'version inconnue'}`;
+  } catch { /* sans importance */ }
+
   try {
     const reponse = await caches.open('forme-diag').then((c) => c.match('/diag'));
     if (!reponse) {
