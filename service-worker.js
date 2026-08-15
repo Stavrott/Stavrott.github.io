@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v34';
+const CACHE_NAME = 'forme-v35';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -94,23 +94,35 @@ self.addEventListener('push', (event) => {
     const tagFin = data.tag ?? 'timer-rest-done';
     const dejaAffichee = (await self.registration.getNotifications({ tag: tagFin })).length > 0;
 
-    await self.registration.showNotification(data.title, {
+    const options = {
       body: data.body,
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
       tag: tagFin,
-      renotify: dejaAffichee ? false : (data.renotify ?? true),
-      silent: dejaAffichee,
-      // Même motif que la notification locale de fin de repos, pour que
-      // les deux chemins se ressentent pareil au poignet comme en poche.
-      vibrate: data.vibrate ?? [150, 80, 150],
       // Un repos terminé est une alarme : elle reste affichée jusqu'à ce
       // qu'on la balaie, au lieu de disparaître pendant qu'on a le nez
       // dans autre chose. (Retirer cette ligne suffit à revenir à une
       // notification éphémère.)
       requireInteraction: data.requireInteraction ?? true,
       timestamp: Date.now(),
-    }).then(
+    };
+
+    // `silent` et `vibrate` sont mutuellement exclusifs : la spec interdit
+    // qu'une notification silencieuse porte un motif de vibration, et
+    // showNotification rejette avec une TypeError si on met les deux. Les
+    // poser côte à côte faisait échouer l'affichage dans le seul cas où
+    // `dejaAffichee` est vrai — c'est-à-dire exactement le cas visé.
+    if (dejaAffichee) {
+      options.silent = true;
+      options.renotify = false;
+    } else {
+      options.renotify = data.renotify ?? true;
+      // Même motif que la notification locale de fin de repos, pour que
+      // les deux chemins se ressentent pareil au poignet comme en poche.
+      options.vibrate = data.vibrate ?? [150, 80, 150];
+    }
+
+    await self.registration.showNotification(data.title, options).then(
       () => ['affichee', null],
       (e) => ['echec', String(e).slice(0, 200)],
     ).then(async ([etat, erreur]) => {
