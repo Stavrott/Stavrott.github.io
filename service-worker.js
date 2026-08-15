@@ -1,8 +1,9 @@
-const CACHE_NAME = 'forme-v29';
+const CACHE_NAME = 'forme-v30';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/fonts/inter-latin.woff2',
   '/css/variables.css',
   '/css/main.css',
   '/css/components.css',
@@ -49,6 +50,14 @@ self.addEventListener('install', (event) => {
 // Notification push reçue depuis le serveur (send-due-notifications) —
 // fonctionne même si l'app/onglet est complètement fermé, contrairement
 // aux notifications locales déclenchées depuis components/timer.js.
+// `renotify` est indispensable ici, pas cosmétique : pendant tout le repos,
+// la page entretient une notification portant DÉJÀ le tag 'timer-rest'
+// (« Repos en cours », rafraîchie toutes les 5 s par components/timer.js).
+// Quand une notification en remplace une autre de même tag, la spec impose
+// au navigateur de ne pas alerter — ni son, ni vibration — sauf si
+// `renotify` vaut true. Sans lui, la notification de fin de repos
+// s'affichait donc silencieusement : visible en déroulant le volet, mais
+// jamais entendue. C'est exactement le cas où on n'est pas devant l'app.
 self.addEventListener('push', (event) => {
   let data = { title: 'Forme', body: '' };
   try { data = event.data?.json() ?? data; } catch {}
@@ -58,7 +67,17 @@ self.addEventListener('push', (event) => {
       body: data.body,
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
-      tag: 'timer-rest',
+      tag: data.tag ?? 'timer-rest',
+      renotify: data.renotify ?? true,
+      // Même motif que la notification locale de fin de repos, pour que
+      // les deux chemins se ressentent pareil au poignet comme en poche.
+      vibrate: data.vibrate ?? [150, 80, 150],
+      // Un repos terminé est une alarme : elle reste affichée jusqu'à ce
+      // qu'on la balaie, au lieu de disparaître pendant qu'on a le nez
+      // dans autre chose. (Retirer cette ligne suffit à revenir à une
+      // notification éphémère.)
+      requireInteraction: data.requireInteraction ?? true,
+      timestamp: Date.now(),
     })
   );
 });

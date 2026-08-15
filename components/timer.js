@@ -205,7 +205,7 @@ function _beep() {
 // montre connectée : les notifs du téléphone s'y reflètent automatiquement
 // via l'OS, boutons inclus, sans rien construire de natif.
 
-function _showNotification(title, body, actions, { silent = false, renotify = true } = {}) {
+function _showNotification(title, body, actions, { silent = false, renotify = true, requireInteraction = false } = {}) {
   if (!('Notification' in window) || Notification.permission !== 'granted' || !('serviceWorker' in navigator)) return;
   navigator.serviceWorker.ready.then(reg => {
     reg.showNotification(title, {
@@ -215,6 +215,7 @@ function _showNotification(title, body, actions, { silent = false, renotify = tr
       tag: 'timer-rest',
       renotify,
       silent,
+      requireInteraction,
       actions,
     });
   }).catch(() => {});
@@ -225,9 +226,14 @@ const REST_LABEL = [
   { action: 'skip',   title: 'Passer' },
 ];
 
+// En silencieux : on vient tout juste de cocher une série, donc le
+// téléphone est déjà en main — inutile de le faire sonner pour annoncer
+// le début du repos. Ça réserve l'alerte sonore au seul moment où elle
+// sert vraiment, la fin du repos, qui devient du coup plus reconnaissable.
 function _notifyStart(seconds) {
   _lastNotifyUpdate = Date.now();
-  _showNotification('Forme — Repos en cours', `${formatTime(seconds)} restant`, REST_LABEL);
+  _showNotification('Forme — Repos en cours', `${formatTime(seconds)} restant`, REST_LABEL,
+    { silent: true, renotify: false });
 }
 
 // Remet à jour le texte de la même notification (même tag) toutes les
@@ -247,9 +253,12 @@ function _maybeRefreshNotification() {
   _showNotification('Forme — Repos en cours', `${formatTime(remaining)} restant`, REST_LABEL, { silent: true, renotify: false });
 }
 
+// Même traitement que la notification poussée par le serveur : elle sonne,
+// vibre, et reste affichée jusqu'à ce qu'on la balaie.
 function _notifyEnd() {
   _beep();
-  _showNotification('Forme — Repos terminé !', 'C\'est l\'heure de votre prochaine série', []);
+  _showNotification('Forme — Repos terminé !', 'C\'est l\'heure de votre prochaine série', [],
+    { requireInteraction: true });
   if ('vibrate' in navigator) navigator.vibrate([150, 80, 150]);
 }
 
