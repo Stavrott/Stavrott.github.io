@@ -3,6 +3,7 @@ import { supabase }           from '../js/supabase.js';
 import { showToast, formatDate, formatDuration, openModal, closeModal, emptyState, showLoading, hideLoading, confirmDialog, escapeHtml } from '../js/utils.js';
 import { hasActiveSeance, startSeance, resumeActiveView, tryRestoreSeance, MAX_OVERHEAD_MIN } from './seance-active.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
+import { SET_TYPES, setTypeOf, isWorkingRow, setTypeClass, setTypeLabel } from '../js/set-types.js';
 
 // ── Chargement de la page ─────────────────────────────────────────────
 
@@ -452,6 +453,8 @@ async function _renderVolume(section) {
       .from('series')
       .select('seance_id, poids_kg, repetitions, created_at')
       .eq('user_id', currentUser.id)
+      // Le tonnage mesure le travail produit : l'échauffement en est exclu.
+      .neq('type_serie', 'echauffement')
       .gte('created_at', since + 'T00:00:00');
 
     const { data: seances } = await supabase
@@ -590,7 +593,7 @@ async function _openSeanceDetail(seanceId, seanceNom, section) {
     const [{ data: series }, { data: seance }] = await Promise.all([
       supabase
         .from('series')
-        .select('exercice_nom, numero_serie, poids_kg, repetitions, temps_repos_s, notes')
+        .select('exercice_nom, numero_serie, poids_kg, repetitions, temps_repos_s, notes, type_serie')
         .eq('seance_id', seanceId)
         .order('exercice_nom')
         .order('numero_serie'),
@@ -612,7 +615,11 @@ async function _openSeanceDetail(seanceId, seanceNom, section) {
       return acc;
     }, {});
 
-    const totalVol = series.reduce((n, s) => n + (s.poids_kg ?? 0) * (s.repetitions ?? 0), 0);
+    // Les compteurs ne retiennent que le travail effectif ; l'échauffement
+    // reste visible dans le détail, simplement il ne gonfle pas le bilan.
+    const travail  = series.filter(isWorkingRow);
+    const nEchauf  = series.length - travail.length;
+    const totalVol = travail.reduce((n, s) => n + (s.poids_kg ?? 0) * (s.repetitions ?? 0), 0);
     const calories = seance?.calories_estimees ?? null;
     const muscles  = seance?.muscles_travailles ?? [];
 
@@ -624,7 +631,7 @@ async function _openSeanceDetail(seanceId, seanceNom, section) {
         </div>
         <div class="card" style="flex:1;text-align:center;padding:var(--space-3)">
           <p class="card-title">Séries</p>
-          <p class="card-value" style="font-size:var(--font-size-xl)">${series.length}</p>
+          <p class="card-value" style="font-size:var(--font-size-xl)">${travail.length}${nEchauf ? `<span> +${nEchauf} éch.</span>` : ''}</p>
         </div>
         <div class="card" style="flex:1;text-align:center;padding:var(--space-3)">
           <p class="card-title">Volume</p>
@@ -650,7 +657,8 @@ async function _openSeanceDetail(seanceId, seanceNom, section) {
           <div style="display:flex;flex-direction:column;gap:var(--space-2)">
             ${sets.map(s => `
               <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-3);background:var(--surface-2);border-radius:var(--radius-sm)">
-                <div class="set-num set-num-done" style="flex-shrink:0">${s.numero_serie}</div>
+                <div class="set-num set-num-done ${setTypeClass(s.type_serie)}" style="flex-shrink:0"
+                  title="${escapeHtml(setTypeLabel(s.type_serie))}">${SET_TYPES[setTypeOf(s.type_serie)].court || s.numero_serie}</div>
                 <span style="flex:1;font-size:var(--font-size-sm);font-weight:700">${s.poids_kg ?? '—'} kg × ${s.repetitions ?? '—'}</span>
                 ${s.notes ? `<span style="font-size:var(--font-size-xs);color:var(--text-muted)">${s.notes}</span>` : ''}
               </div>`).join('')}

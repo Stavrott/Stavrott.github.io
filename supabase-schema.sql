@@ -161,6 +161,33 @@ alter table seances add column if not exists muscles_travailles text[];
 -- [{id:'week-stats', hidden:false}, ...] — ordre + visibilité par widget.
 alter table profils add column if not exists home_layout jsonb;
 
+-- ── Type de série : échauffement / normale / dégressive / échec ────────
+-- Voir js/set-types.js. Sans cette colonne, une série d'échauffement
+-- comptait comme une série de travail : elle entrait dans le tonnage
+-- hebdomadaire, dans les records 1RM, dans la courbe de progression et
+-- s'affichait comme "dernière fois".
+--
+-- Postgres remplit les lignes existantes avec la valeur par défaut :
+-- tout l'historique déjà saisi est donc considéré comme du travail
+-- effectif, ce qui est le comportement actuel — rien ne bouge
+-- rétroactivement, seules les nouvelles séries peuvent être qualifiées.
+alter table series add column if not exists type_serie text not null default 'normale';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'series_type_serie_valide'
+  ) then
+    alter table series add constraint series_type_serie_valide
+      check (type_serie in ('normale', 'echauffement', 'degressive', 'echec'));
+  end if;
+end $$;
+
+-- Les statistiques ne lisent que les séries de travail.
+create index if not exists idx_series_travail
+  on series(user_id, exercice_nom)
+  where type_serie <> 'echauffement';
+
 -- ── Notifications push (repos fiable même app fermée) ──────────────────
 -- Un appareil = un abonnement Web Push. Géré directement par le client
 -- (RLS classique user_id = auth.uid()).

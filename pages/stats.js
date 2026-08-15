@@ -162,6 +162,8 @@ async function _renderRecords(section) {
       .from('series')
       .select('exercice_nom, poids_kg, repetitions, created_at')
       .eq('user_id', currentUser.id)
+      // Un record ne se bat pas à l'échauffement.
+      .neq('type_serie', 'echauffement')
       .not('poids_kg', 'is', null)
       .not('repetitions', 'is', null);
 
@@ -223,6 +225,7 @@ async function _renderProgression(section) {
       .from('series')
       .select('exercice_nom')
       .eq('user_id', currentUser.id)
+      .neq('type_serie', 'echauffement')
       .not('poids_kg', 'is', null);
 
     const exoNames = [...new Set((exoList ?? []).map(s => s.exercice_nom))].sort();
@@ -261,6 +264,9 @@ async function _renderProgression(section) {
         .select('poids_kg, repetitions, created_at, seance_id')
         .eq('user_id', currentUser.id)
         .eq('exercice_nom', exoNom)
+        // La courbe suit la charge de travail : un échauffement lourd sur
+        // un exercice où l'on progresse ferait un faux palier.
+        .neq('type_serie', 'echauffement')
         .not('poids_kg', 'is', null)
         .not('repetitions', 'is', null)
         .order('created_at', { ascending: true });

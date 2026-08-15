@@ -260,6 +260,8 @@ async function _loadChart(routineNom) {
     const { data: seriesData, error: e2 } = await supabase
       .from('series')
       .select('seance_id, poids_kg, repetitions')
+      // Tonnage = travail effectif, sans l'échauffement (js/set-types.js).
+      .neq('type_serie', 'echauffement')
       .in('seance_id', seances.map(s => s.id));
 
     if (e2) { _renderEmptyChart(area); return; }

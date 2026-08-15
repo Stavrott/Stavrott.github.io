@@ -606,6 +606,8 @@ async function _loadProgression(exo) {
       .select('poids_kg, repetitions, created_at, seance_id')
       .eq('user_id', currentUser.id)
       .eq('exercice_nom', exo.nom)
+      // Séries de travail uniquement (voir js/set-types.js).
+      .neq('type_serie', 'echauffement')
       .not('poids_kg', 'is', null)
       .not('repetitions', 'is', null)
       .order('created_at', { ascending: true });

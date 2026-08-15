@@ -402,6 +402,26 @@
   color: white; box-shadow: var(--shadow-accent-sm);
 }
 
+/* La pastille est cliquable : elle ouvre le choix du type de série. */
+button.set-num { cursor: pointer; font-family: inherit; padding: 0; }
+button.set-num:active { transform: scale(0.88); }
+
+/* Types de série (voir js/set-types.js) — déclarés après .set-num-done
+   pour qu'une série validée garde la couleur de son type plutôt que le
+   dégradé d'accent : c'est l'information la plus utile à relire. */
+.set-num.set-type-echauffement {
+  background: var(--color-warning-light); border-color: var(--color-warning);
+  color: var(--color-warning); box-shadow: none;
+}
+.set-num.set-type-degressive {
+  background: var(--color-info-light); border-color: var(--color-info);
+  color: var(--color-info); box-shadow: none;
+}
+.set-num.set-type-echec {
+  background: var(--color-error-light); border-color: var(--color-error);
+  color: var(--color-error); box-shadow: none;
+}
+
 .set-prev {
   flex: 1; font-size: 11px; font-weight: 600; color: var(--text-muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

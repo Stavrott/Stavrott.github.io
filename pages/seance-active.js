@@ -4,6 +4,7 @@ import { showToast, formatTime, openModal, closeModal, confirmDialog } from '../
 import { startRestTimer, hideTimer }  from '../components/timer.js';
 import { APP_CONFIG }                 from '../js/config.js';
 import { metricFields, parseFieldValue, fieldByKey, FIELD_DB_COLUMN, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
+import { SET_TYPES, DEFAULT_SET_TYPE, setTypeOf, isWorkingSet, setTypeLabel, setTypeClass } from '../js/set-types.js';
 import { estimateCaloriesSeance, musclesTravailles } from '../js/calories.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 import { getPoidsActuel } from './profil.js';
@@ -431,7 +432,7 @@ function _setRowHTML(exo, set, ei, si) {
           ${_SVG_DOWN}
         </button>
       </div>
-      <div class="set-num ${done ? 'set-num-done' : ''}">${si + 1}</div>
+      ${_setNumHTML(exo, set, ei, si)}
       <div class="set-prev" id="setprev-${ei}-${si}">${_esc(prev)}</div>
       ${fields.map((f, i) => `
         <input class="set-input${done ? ' set-input-done' : ''}" type="number" inputmode="${f.type === 'int' ? 'numeric' : 'decimal'}" step="${f.step}" min="0"
@@ -579,7 +580,7 @@ function _supersetRoundHTML(indices, exos, r, nCols, widths, blockHasDuree) {
               ${_SVG_DOWN}
             </button>
           </div>` : `<span style="width:20px;flex-shrink:0"></span>`}
-        <div class="set-num ${s.done ? 'set-num-done' : ''}">${r + 1}</div>
+        ${_setNumHTML(ex, s, ei, r)}
         <div class="set-prev" id="setprev-${ei}-${r}">${_esc(ex.nom)}</div>
         ${inputs}
         ${blockHasDuree
@@ -634,6 +635,7 @@ async function _onCardClick(e) {
   if (action === 'remove-serie')   await _removeSerie(parseInt(exo), parseInt(setIdx));
   if (action === 'remove-round')   await _removeRound(indices.split(',').map(Number), parseInt(round));
   if (action === 'toggle-timer')   _toggleTimer(parseInt(exo), parseInt(setIdx));
+  if (action === 'set-type')       _openSetTypePicker(parseInt(exo), parseInt(setIdx));
   if (action === 'make-superset')  _makeSuperset(parseInt(exo));
   if (action === 'break-superset') _breakSuperset(parseInt(exo));
   if (action === 'show-exo-detail') await _showExoDetail(parseInt(exo));
@@ -652,9 +654,98 @@ function _onInputChange(e) {
 // ── Actions ───────────────────────────────────────────────────────────
 
 function _blankSet(fields, perf) {
-  const set = { repos: null, done: false, dbId: null };
+  const set = { repos: null, done: false, dbId: null, type: DEFAULT_SET_TYPE };
   fields.forEach(f => { set[f.key] = perf?.sets?.[0]?.[f.key] ?? null; });
   return set;
+}
+
+// ── Type de série ─────────────────────────────────────────────────────
+// Numéro affiché dans la pastille : les séries d'échauffement portent une
+// lettre au lieu d'un numéro et ne consomment pas de rang, pour que la
+// numérotation visible corresponde aux séries de travail — la 1re série
+// affichée reste la première qui compte, quel que soit l'échauffement.
+
+function _workingNumber(exo, si) {
+  let n = 0;
+  for (let i = 0; i <= si; i++) {
+    if (isWorkingSet(exo.sets[i]?.type)) n++;
+  }
+  return n;
+}
+
+function _setNumHTML(exo, set, ei, si) {
+  const type  = setTypeOf(set?.type);
+  const label = SET_TYPES[type].court || _workingNumber(exo, si);
+  const cls   = [
+    'set-num',
+    set?.done ? 'set-num-done' : '',
+    setTypeClass(type),
+  ].filter(Boolean).join(' ');
+
+  return `
+    <button class="${cls}" data-action="set-type" data-exo="${ei}" data-set="${si}"
+      aria-label="Type de série : ${_esc(setTypeLabel(type))}"
+      title="${_esc(setTypeLabel(type))}">${label}</button>`;
+}
+
+function _openSetTypePicker(ei, si) {
+  const exo = _state.exercices[ei];
+  const set = exo?.sets[si];
+  if (!set) return;
+
+  const current = setTypeOf(set.type);
+
+  openModal({
+    title: 'Type de série',
+    body: `
+      <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+        ${Object.entries(SET_TYPES).map(([id, t]) => `
+          <button data-type="${id}"
+            style="display:flex;align-items:center;gap:var(--space-3);width:100%;
+              padding:var(--space-3);border-radius:var(--radius-md);cursor:pointer;
+              background:${id === current ? 'var(--color-primary-light)' : 'var(--surface-2)'};
+              border:1.5px solid ${id === current ? 'var(--color-primary)' : 'transparent'};
+              font-family:inherit;text-align:left">
+            <span class="set-num ${setTypeClass(id)}">${t.court || '#'}</span>
+            <span style="flex:1">
+              <span style="display:block;font-size:var(--font-size-sm);font-weight:700;color:var(--text-primary)">${t.label}</span>
+              <span style="display:block;font-size:var(--font-size-xs);color:var(--text-muted)">${t.aide}</span>
+            </span>
+            ${id === current ? `
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="3"
+                stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>` : ''}
+          </button>`).join('')}
+      </div>`,
+  });
+
+  document.getElementById('modal-body')
+    .querySelectorAll('[data-type]')
+    .forEach(btn => btn.addEventListener('click', () => {
+      closeModal();
+      _setSerieType(ei, si, btn.dataset.type);
+    }));
+}
+
+async function _setSerieType(ei, si, type) {
+  const set = _state.exercices[ei]?.sets[si];
+  if (!set || setTypeOf(set.type) === setTypeOf(type)) return;
+
+  set.type = setTypeOf(type);
+
+  // Série déjà validée : la ligne existe en base, on la requalifie sur place
+  // plutôt que de la supprimer et de la réécrire — l'horodatage d'origine
+  // sert au calcul de la durée de séance.
+  if (set.dbId) {
+    await supabase.from('series')
+      .update({ type_serie: set.type })
+      .eq('id', set.dbId)
+      .catch(() => showToast('Type modifié localement, sauvegarde impossible', 'error'));
+  }
+
+  render();
+  _persistState();
 }
 
 async function _lookupExerciceMeta(nom) {
@@ -766,7 +857,7 @@ export async function addExercicesFromRoutine(routine) {
 
     const sets = plannedSeries
       ? plannedSeries.map(s => {
-          const set = { repos: s.repos ?? null, done: false, dbId: null };
+          const set = { repos: s.repos ?? null, done: false, dbId: null, type: setTypeOf(s.type) };
           fields.forEach(f => { set[f.key] = s[f.key] ?? null; });
           return set;
         })
@@ -794,18 +885,20 @@ function _addSerie(ei) {
   const blocks = _buildBlocks(_state.exercices);
   const block  = blocks[_findBlockContaining(blocks, ei)];
 
+  // Une série ajoutée à la main est une série de travail, même si la
+  // précédente était un échauffement : on ne recopie pas son type.
   if (block.type === 'superset') {
     block.indices.forEach(idx => {
       const exo    = _state.exercices[idx];
       const fields = metricFields(exo.type_metrique);
-      const newSet = { repos: null, done: false, dbId: null };
+      const newSet = { repos: null, done: false, dbId: null, type: DEFAULT_SET_TYPE };
       fields.forEach(f => { newSet[f.key] = exo.sets.at(-1)?.[f.key] ?? null; });
       exo.sets.push(newSet);
     });
   } else {
     const exo    = _state.exercices[ei];
     const fields = metricFields(exo.type_metrique);
-    const newSet = { repos: null, done: false, dbId: null };
+    const newSet = { repos: null, done: false, dbId: null, type: DEFAULT_SET_TYPE };
     fields.forEach(f => { newSet[f.key] = exo.sets.at(-1)?.[f.key] ?? null; });
     exo.sets.push(newSet);
   }
@@ -1037,6 +1130,7 @@ async function _toggleDone(ei, si) {
       exercice_nom:  exo.nom,
       numero_serie:  si + 1,
       temps_repos_s: set.repos,
+      type_serie:    setTypeOf(set.type),
     };
     fields.forEach(f => { row[FIELD_DB_COLUMN[f.key]] = set[f.key] ?? null; });
 
@@ -1098,6 +1192,7 @@ async function _toggleRound(indices, r) {
       exercice_nom:  exo.nom,
       numero_serie:  r + 1,
       temps_repos_s: set.repos,
+      type_serie:    setTypeOf(set.type),
     };
     fields.forEach(f => { row[FIELD_DB_COLUMN[f.key]] = set[f.key] ?? null; });
 
@@ -1129,6 +1224,9 @@ async function _fetchLastPerf(nom, type_metrique = DEFAULT_METRIC_TYPE) {
       .select(cols.join(', '))
       .eq('user_id', currentUser.id)
       .eq('exercice_nom', nom)
+      // Un échauffement à 40 kg ne doit pas s'afficher comme la charge de
+      // référence de la dernière fois, ni servir de valeur pré-remplie.
+      .neq('type_serie', 'echauffement')
       .order('created_at', { ascending: false })
       .limit(4);
 

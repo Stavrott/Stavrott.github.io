@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v28';
+const CACHE_NAME = 'forme-v29';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
   '/js/utils.js',
   '/js/push.js',
   '/js/metrics.js',
+  '/js/set-types.js',
   '/js/calories.js',
   '/js/body-map.js',
   '/js/exercisedb.js',
