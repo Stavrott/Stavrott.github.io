@@ -95,9 +95,19 @@ Deno.serve(async (_req) => {
   // supabase-schema.sql), et cette fonction n'agit que sur des notifications
   // déjà dues d'après push_pending, rien qu'un appelant ne contrôle.
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+  // Les JWK doivent d'abord être importés en CryptoKey : ApplicationServer
+  // attend une paire de clés WebCrypto, pas les objets JSON bruts. Les
+  // passer tels quels laissait la construction réussir, puis échouer à la
+  // signature de CHAQUE envoi avec « Argument 2 is not of type CryptoKey ».
+  // L'erreur était avalée par le catch, d'où des mois d'échecs muets.
+  const vapidKeys = await webpush.importVapidKeys(
+    { publicKey: VAPID_PUBLIC_JWK, privateKey: VAPID_PRIVATE_JWK },
+    { extractable: false },
+  );
   const appServer = await webpush.ApplicationServer.new({
     contactInformation: CONTACT_EMAIL,
-    vapidKeys: { publicKey: VAPID_PUBLIC_JWK, privateKey: VAPID_PRIVATE_JWK },
+    vapidKeys,
   });
 
   const start = Date.now();
