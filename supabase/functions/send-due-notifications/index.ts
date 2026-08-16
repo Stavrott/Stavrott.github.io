@@ -64,7 +64,22 @@ async function sendDue(admin: ReturnType<typeof createClient>, appServer: webpus
           endpoint: sub.endpoint,
           keys: { p256dh: sub.p256dh, auth: sub.auth_key },
         });
-        await subscriber.pushTextMessage(JSON.stringify({ title: notif.title, body: notif.body }), {});
+        await subscriber.pushTextMessage(
+          JSON.stringify({ title: notif.title, body: notif.body }),
+          {
+            // Sans urgence haute, la livraison part en `normal` : Android est
+            // alors libre de la différer jusqu'au prochain réveil de
+            // l'appareil, d'où une notification de fin de repos qui n'arrive
+            // qu'au moment où l'on touche son téléphone. Une alarme doit
+            // traverser la mise en veille.
+            urgency: webpush.Urgency.High,
+            // Le défaut est de 28 jours : une notification non livrée reste
+            // en attente chez FCM tout ce temps et finit par arriver hors de
+            // propos. Passé deux minutes, une fin de repos ne veut plus rien
+            // dire — mieux vaut qu'elle expire.
+            ttl: 120,
+          },
+        );
         console.info(`[push] envoyé -> ${hote} (notif ${notif.id})`);
       } catch (e) {
         const msg = String(e);
