@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v36';
+const CACHE_NAME = 'forme-v37';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -87,12 +87,12 @@ self.addEventListener('push', (event) => {
     // passage pour ne pas laisser deux notifications côte à côte.
     (await self.registration.getNotifications({ tag: 'timer-rest' })).forEach((n) => n.close());
 
-    // Les deux chemins — minuteur local et push serveur — peuvent aboutir
-    // pour un même repos, à quelques secondes d'écart. Le premier arrivé
-    // alerte ; le second se contente de mettre la notification à jour, sans
-    // refaire sonner le téléphone.
+    // Ce chemin alerte toujours. Il est le seul à annoncer la fin dès qu'un
+    // push a pu être programmé (voir _notifyEnd dans components/timer.js) :
+    // se mettre en silencieux parce qu'une notification locale est déjà
+    // affichée revenait à faire taire le seul chemin réellement audible
+    // quand l'app est en arrière-plan.
     const tagFin = data.tag ?? 'timer-rest-done';
-    const dejaAffichee = (await self.registration.getNotifications({ tag: tagFin })).length > 0;
 
     const options = {
       body: data.body,
@@ -105,22 +105,12 @@ self.addEventListener('push', (event) => {
       // notification éphémère.)
       requireInteraction: data.requireInteraction ?? true,
       timestamp: Date.now(),
+      renotify: data.renotify ?? true,
+      // Ne jamais poser `silent` en même temps que `vibrate` : la spec
+      // interdit qu'une notification silencieuse porte un motif de
+      // vibration, et showNotification rejette alors avec une TypeError.
+      vibrate: data.vibrate ?? [150, 80, 150],
     };
-
-    // `silent` et `vibrate` sont mutuellement exclusifs : la spec interdit
-    // qu'une notification silencieuse porte un motif de vibration, et
-    // showNotification rejette avec une TypeError si on met les deux. Les
-    // poser côte à côte faisait échouer l'affichage dans le seul cas où
-    // `dejaAffichee` est vrai — c'est-à-dire exactement le cas visé.
-    if (dejaAffichee) {
-      options.silent = true;
-      options.renotify = false;
-    } else {
-      options.renotify = data.renotify ?? true;
-      // Même motif que la notification locale de fin de repos, pour que
-      // les deux chemins se ressentent pareil au poignet comme en poche.
-      options.vibrate = data.vibrate ?? [150, 80, 150];
-    }
 
     await self.registration.showNotification(data.title, options).then(
       () => ['affichee', null],

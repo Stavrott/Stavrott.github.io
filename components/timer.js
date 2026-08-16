@@ -280,8 +280,18 @@ async function _notifyEnd() {
     const reg = await navigator.serviceWorker.ready;
     // Le décompte n'a plus lieu d'être affiché à côté de « terminé ».
     (await reg.getNotifications({ tag: TAG_REPOS })).forEach(n => n.close());
-    if ((await reg.getNotifications({ tag: TAG_FIN })).length) return; // le push a déjà alerté
   } catch {}
+
+  // Un seul chemin annonce la fin, et c'est le push serveur dès qu'il a pu
+  // être programmé : il arrive à l'heure même quand la page est bridée ou
+  // suspendue. La page, elle, en arrière-plan, pose une notification qui
+  // n'alerte pas — son beep et sa vibration étant de surcroît inertes.
+  // Les laisser se disputer le même tag revenait à faire taire le seul qui
+  // sonnait vraiment : la notification locale arrivait la première, et le
+  // push se mettait en silencieux en la voyant déjà affichée.
+  // Le minuteur local ne notifie donc plus que si aucun push n'est prévu :
+  // hors ligne, ou notifications refusées.
+  if (pendingPushId) return;
 
   _showNotification('Forme — Repos terminé !', 'C\'est l\'heure de votre prochaine série', [],
     { requireInteraction: true, tag: TAG_FIN });
