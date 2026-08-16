@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v37';
+const CACHE_NAME = 'forme-v38';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -58,6 +58,28 @@ self.addEventListener('install', (event) => {
 // l'app est en arrière-plan écran allumé, ou s'il l'atteint sans alerter.
 // À retirer une fois la question tranchée.
 const DIAG_CACHE = 'forme-diag';
+
+// Remontée du diagnostic vers la base, en plus du cache local : un bandeau
+// dans l'app suppose que quelqu'un le lise au bon moment, ce qui s'est
+// révélé peu praticable. Ces deux valeurs sont déjà publiques (js/config.js).
+// Table et politiques temporaires — voir la note dans push_diag.
+const DIAG_URL = 'https://ytkrjraoqmroankhidip.supabase.co/rest/v1/push_diag';
+const DIAG_KEY = 'sb_publishable_bBM2IhLy67iX7-e-n6SaFg__WDrReHj';
+
+async function _diagRemote(detail) {
+  try {
+    await fetch(DIAG_URL, {
+      method: 'POST',
+      headers: {
+        'apikey': DIAG_KEY,
+        'Authorization': `Bearer ${DIAG_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({ evenement: 'push', detail }),
+    });
+  } catch { /* le diagnostic ne doit jamais casser la notification */ }
+}
 
 async function _diagLog(entree) {
   try {
@@ -121,13 +143,16 @@ self.addEventListener('push', (event) => {
       // propres notifications) au moment où le push est arrivé.
       const fenetres = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       const affichees = await self.registration.getNotifications();
-      await _diagLog({
-        t: new Date().toISOString(),
+      const detail = {
+        sw: CACHE_NAME,
         etat,
         erreur,
+        options: { renotify: options.renotify, vibrate: !!options.vibrate, requireInteraction: options.requireInteraction, tag: options.tag },
         fenetres: fenetres.map((c) => ({ vis: c.visibilityState, focus: c.focused })),
         tags: affichees.map((n) => n.tag),
-      });
+      };
+      await _diagLog({ t: new Date().toISOString(), ...detail });
+      await _diagRemote(detail);
     });
   })());
 });
