@@ -276,10 +276,15 @@ async function _notifyEnd() {
   _beep();
   if ('vibrate' in navigator) navigator.vibrate([150, 80, 150]);
 
+  let tagUnique = `${TAG_FIN}-${Date.now()}`;
   try {
     const reg = await navigator.serviceWorker.ready;
-    // Le décompte n'a plus lieu d'être affiché à côté de « terminé ».
-    (await reg.getNotifications({ tag: TAG_REPOS })).forEach(n => n.close());
+    // Ferme tout ce qui reste d'un repos, décompte comme fin précédente :
+    // une notification qui en remplace une autre n'alerte pas de façon
+    // fiable, et `requireInteraction` garde la précédente à l'écran.
+    (await reg.getNotifications())
+      .filter(n => n.tag && n.tag.startsWith(TAG_REPOS))
+      .forEach(n => n.close());
   } catch {}
 
   // Un seul chemin annonce la fin, et c'est le push serveur dès qu'il a pu
@@ -294,7 +299,7 @@ async function _notifyEnd() {
   if (pendingPushId) return;
 
   _showNotification('Forme — Repos terminé !', 'C\'est l\'heure de votre prochaine série', [],
-    { requireInteraction: true, tag: TAG_FIN });
+    { requireInteraction: true, tag: tagUnique });
 }
 
 // Réagit aux boutons d'action tapés sur la notification (relayés par le

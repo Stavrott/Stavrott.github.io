@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v38';
+const CACHE_NAME = 'forme-v39';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -107,14 +107,19 @@ self.addEventListener('push', (event) => {
     // son propre tag : sinon elle ne serait qu'un remplacement de plus, et un
     // remplacement n'alerte pas de façon fiable. On ferme le décompte au
     // passage pour ne pas laisser deux notifications côte à côte.
-    (await self.registration.getNotifications({ tag: 'timer-rest' })).forEach((n) => n.close());
+    // Ferme TOUTE notification de repos encore affichée — le décompte comme
+    // une fin précédente. C'est le point clé : `requireInteraction` maintient
+    // la notification de fin à l'écran jusqu'à ce qu'on la balaie, si bien
+    // qu'à partir du deuxième repos la nouvelle ne faisait que remplacer
+    // l'ancienne. Or un remplacement n'alerte pas de façon fiable, quoi que
+    // dise `renotify` : ni son, ni vibration. D'où une seule notification
+    // audible — la toute première — et le silence ensuite.
+    const encore = await self.registration.getNotifications();
+    encore.filter((n) => n.tag && n.tag.startsWith('timer-rest')).forEach((n) => n.close());
 
-    // Ce chemin alerte toujours. Il est le seul à annoncer la fin dès qu'un
-    // push a pu être programmé (voir _notifyEnd dans components/timer.js) :
-    // se mettre en silencieux parce qu'une notification locale est déjà
-    // affichée revenait à faire taire le seul chemin réellement audible
-    // quand l'app est en arrière-plan.
-    const tagFin = data.tag ?? 'timer-rest-done';
+    // Tag unique par repos : la notification est toujours neuve, jamais un
+    // remplacement. On ne dépend plus du tout du comportement de `renotify`.
+    const tagFin = data.tag ?? `timer-rest-done-${Date.now()}`;
 
     const options = {
       body: data.body,
