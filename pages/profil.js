@@ -504,8 +504,12 @@ function _openPoidsModal(isUpdate, section) {
     <h3 style="font-weight:800;margin-bottom:var(--space-5)">${isUpdate ? 'Modifier le poids' : 'Enregistrer le poids'}</h3>
     <div class="form-group" style="margin-bottom:var(--space-5)">
       <label class="form-label">Poids (kg)</label>
-      <input class="form-input" id="poids-input" type="number" step="0.1" min="20" max="300"
-        placeholder="ex: 75.5" style="font-size:var(--font-size-2xl);font-weight:900;text-align:center" inputmode="decimal">
+      <!-- type="text" et non "number" : sur un clavier français la touche
+           décimale est une virgule, qu'un champ number refuse — la valeur lue
+           est alors vide, et l'enregistrement échouait sans qu'on voie pourquoi.
+           inputmode="decimal" garde le pavé numérique sur mobile. -->
+      <input class="form-input" id="poids-input" type="text" inputmode="decimal"
+        placeholder="ex: 75,5" style="font-size:var(--font-size-2xl);font-weight:900;text-align:center">
     </div>
     <div style="display:flex;gap:var(--space-3)">
       <button class="btn btn-secondary" id="poids-cancel" style="flex:1">Annuler</button>
@@ -518,8 +522,11 @@ function _openPoidsModal(isUpdate, section) {
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 
   overlay.querySelector('#poids-save').addEventListener('click', async () => {
-    const val = parseFloat(overlay.querySelector('#poids-input').value);
-    if (!val || val < 20 || val > 300) { showToast('Entrez un poids valide', 'warning'); return; }
+    const brut = overlay.querySelector('#poids-input').value.trim().replace(',', '.');
+    const val = parseFloat(brut);
+    if (!Number.isFinite(val) || val < 20 || val > 300) {
+      showToast('Entrez un poids entre 20 et 300 kg', 'warning'); return;
+    }
     try {
       const { error } = await supabase.from('historique_poids').upsert({
         user_id: currentUser.id, date: todayStr(), poids_kg: val,
@@ -528,7 +535,12 @@ function _openPoidsModal(isUpdate, section) {
       showToast('Poids enregistré', 'success');
       overlay.remove();
       await _reload(section);
-    } catch { showToast('Erreur lors de l\'enregistrement', 'error'); }
+    } catch (e) {
+      // Le message de la base plutôt qu'un échec générique : sans lui, une
+      // contrainte manquante et une coupure réseau se ressemblent à l'écran.
+      console.error('[poids] enregistrement', e);
+      showToast(`Enregistrement impossible : ${e?.message ?? e}`, 'error', 8000);
+    }
   });
 }
 
