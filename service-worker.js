@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v39';
+const CACHE_NAME = 'forme-v40';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -50,48 +50,6 @@ self.addEventListener('install', (event) => {
 // Notification push reçue depuis le serveur (send-due-notifications) —
 // fonctionne même si l'app/onglet est complètement fermé, contrairement
 // aux notifications locales déclenchées depuis components/timer.js.
-// ── Journal de diagnostic (temporaire) ─────────────────────────────────
-// Le service worker n'a ni console ni logs accessibles depuis un téléphone.
-// On consigne donc chaque push reçu dans un cache dédié, que la page relit
-// au lancement suivant pour l'afficher (voir _initDiag dans js/app.js).
-// Objectif : savoir si le push atteint seulement le service worker quand
-// l'app est en arrière-plan écran allumé, ou s'il l'atteint sans alerter.
-// À retirer une fois la question tranchée.
-const DIAG_CACHE = 'forme-diag';
-
-// Remontée du diagnostic vers la base, en plus du cache local : un bandeau
-// dans l'app suppose que quelqu'un le lise au bon moment, ce qui s'est
-// révélé peu praticable. Ces deux valeurs sont déjà publiques (js/config.js).
-// Table et politiques temporaires — voir la note dans push_diag.
-const DIAG_URL = 'https://ytkrjraoqmroankhidip.supabase.co/rest/v1/push_diag';
-const DIAG_KEY = 'sb_publishable_bBM2IhLy67iX7-e-n6SaFg__WDrReHj';
-
-async function _diagRemote(detail) {
-  try {
-    await fetch(DIAG_URL, {
-      method: 'POST',
-      headers: {
-        'apikey': DIAG_KEY,
-        'Authorization': `Bearer ${DIAG_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({ evenement: 'push', detail }),
-    });
-  } catch { /* le diagnostic ne doit jamais casser la notification */ }
-}
-
-async function _diagLog(entree) {
-  try {
-    const c = await caches.open(DIAG_CACHE);
-    const precedent = await c.match('/diag').then((r) => (r ? r.json() : [])).catch(() => []);
-    const liste = [entree, ...(Array.isArray(precedent) ? precedent : [])].slice(0, 10);
-    await c.put('/diag', new Response(JSON.stringify(liste), {
-      headers: { 'Content-Type': 'application/json' },
-    }));
-  } catch { /* le diagnostic ne doit jamais casser la notification */ }
-}
-
 // Deux garde-fous contre le même piège : une notification qui en remplace
 // une autre de même tag n'alerte pas — ni son, ni vibration — sauf si
 // `renotify` vaut true. La notification de fin de repos a donc son propre
@@ -139,26 +97,7 @@ self.addEventListener('push', (event) => {
       vibrate: data.vibrate ?? [150, 80, 150],
     };
 
-    await self.registration.showNotification(data.title, options).then(
-      () => ['affichee', null],
-      (e) => ['echec', String(e).slice(0, 200)],
-    ).then(async ([etat, erreur]) => {
-      // L'état des fenêtres ouvertes est la mesure qui manque : elle dit si
-      // la page était encore vivante (et donc en train de réécrire ses
-      // propres notifications) au moment où le push est arrivé.
-      const fenetres = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      const affichees = await self.registration.getNotifications();
-      const detail = {
-        sw: CACHE_NAME,
-        etat,
-        erreur,
-        options: { renotify: options.renotify, vibrate: !!options.vibrate, requireInteraction: options.requireInteraction, tag: options.tag },
-        fenetres: fenetres.map((c) => ({ vis: c.visibilityState, focus: c.focused })),
-        tags: affichees.map((n) => n.tag),
-      };
-      await _diagLog({ t: new Date().toISOString(), ...detail });
-      await _diagRemote(detail);
-    });
+    await self.registration.showNotification(data.title, options);
   })());
 });
 
@@ -184,7 +123,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys
-        .filter((k) => k !== CACHE_NAME && k !== DIAG_CACHE)
+        .filter((k) => k !== CACHE_NAME)
         .map((k) => caches.delete(k)))
     )
   );

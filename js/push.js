@@ -10,14 +10,9 @@
 import { supabase } from './supabase.js';
 import { currentUser } from './auth.js';
 import { VAPID_PUBLIC_KEY } from './config.js';
-import { showToast } from './utils.js';
 
-// TEMPORAIRE — diagnostic sur mobile sans devtools. Affiche l'échec en
-// toast (une seule fois par session) en plus du console.error habituel.
-let _warned = false;
 function _warn(msg, e) {
   console.error(`[push] ${msg}`, e ?? '');
-  if (!_warned) { _warned = true; showToast(`Push: ${msg}`, 'error', 6000); }
 }
 
 function _urlBase64ToUint8Array(base64) {
