@@ -2,6 +2,7 @@ import { currentUser }  from '../js/auth.js';
 import { supabase }      from '../js/supabase.js';
 import { debounce, openModal, closeModal, showToast, showLoading, hideLoading, emptyState,
          calc1RM, formatDate, todayStr, lsGet, lsSet, svgLineChart, confirmDialog } from '../js/utils.js';
+import { fetchAll, sessionsOf, summarize, fmtNum, fmtDuree, fmtShortDate, lineChartHTML } from '../js/perf.js';
 import { fetchExerciseImage, fetchExerciseImages } from '../js/exercisedb.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 import { METRIC_TYPES, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
@@ -536,143 +537,153 @@ function _loadListImages(container) {
 const _DETAIL_MAP_UID = 'exo-detail';
 
 export function openExoDetail(exo) {
+  const muscles = exo.muscles ?? [];
+  const chips = [
+    ...muscles.slice(0, 3).map(m => `<span class="xd-chip is-accent">${_esc(m)}</span>`),
+    exo.materiel && exo.materiel !== 'Aucun' ? `<span class="xd-chip">${_esc(exo.materiel)}</span>` : '',
+    exo.niveau ? `<span class="xd-chip">${_esc(exo.niveau)}</span>` : '',
+    exo.custom ? `<span class="xd-chip">Perso</span>` : '',
+  ].join('');
+
   openModal({
     title: exo.nom,
     onClose: _stopGifSlideshow,
     body: `
-      <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+      <div class="xd">
+        ${chips ? `<div class="xd-chips">${chips}</div>` : ''}
 
-        <!-- Illustration -->
-        <div id="exo-gif-wrap" style="border-radius:10px;overflow:hidden;background:var(--surface-2);
-          min-height:180px;display:flex;align-items:center;justify-content:center">
-          <div id="exo-gif-inner" style="width:100%;text-align:center;padding:16px">
-            <div class="skeleton" style="width:100%;height:180px;border-radius:8px"></div>
-          </div>
+        <div class="xd-hero" id="xd-hero">
+          <div class="skeleton" style="height:28px;width:45%;border-radius:8px"></div>
+          <div class="skeleton" style="height:120px;margin-top:16px;border-radius:12px"></div>
         </div>
+        <div class="xd-tiles" id="xd-tiles"></div>
 
-        <!-- Badges -->
-        <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
-          <span class="badge badge-primary">${exo.groupe}</span>
-          <span class="badge badge-muted">${exo.materiel}</span>
-          ${exo.niveau ? `<span class="badge badge-muted">${exo.niveau}</span>` : ''}
-          ${exo.custom ? `<span class="badge badge-primary">Custom</span>` : ''}
-        </div>
+        <section class="xd-section" id="xd-last-wrap" hidden>
+          <h3 class="xd-h">Dernières fois</h3>
+          <div class="xd-last" id="xd-last"></div>
+        </section>
 
-        <!-- Muscles -->
-        ${(exo.muscles ?? []).length ? `
-        <div>
-          <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
-            color:var(--text-muted);margin-bottom:var(--space-2)">Muscles ciblés</p>
-          <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
-            ${exo.muscles.map(m => `<span class="muscle-tag">${m}</span>`).join('')}
+        <section class="xd-section">
+          <h3 class="xd-h">Exécution</h3>
+          <div id="exo-gif-wrap" class="xd-media">
+            <div id="exo-gif-inner" style="width:100%;text-align:center">
+              <div class="skeleton" style="width:100%;height:180px;border-radius:12px"></div>
+            </div>
           </div>
-          <div style="margin-top:var(--space-3)">
-            ${bodyMapHTML(_DETAIL_MAP_UID)}
-          </div>
-        </div>` : ''}
+          ${exo.description ? `<p class="xd-text">${_esc(exo.description)}</p>` : ''}
+        </section>
 
-        <!-- Description -->
-        ${exo.description ? `
-        <div>
-          <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
-            color:var(--text-muted);margin-bottom:var(--space-2)">Description</p>
-          <p style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:1.7">${exo.description}</p>
-        </div>` : ''}
-
-        <!-- Progression -->
-        <div>
-          <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
-            color:var(--text-muted);margin-bottom:var(--space-2)">Progression</p>
-          <div id="exo-progression">
-            <div class="skeleton skeleton-card" style="height:140px;margin-bottom:8px"></div>
-            <div class="skeleton skeleton-card" style="height:140px"></div>
-          </div>
-        </div>
+        ${muscles.length ? `
+        <section class="xd-section">
+          <h3 class="xd-h">Muscles ciblés</h3>
+          <div class="xd-map">${bodyMapHTML(_DETAIL_MAP_UID)}</div>
+          <div class="xd-tags">${muscles.map(m => `<span class="muscle-tag">${_esc(m)}</span>`).join('')}</div>
+        </section>` : ''}
       </div>`,
   });
 
-  highlightMuscles(document.getElementById('modal-body'),
-                   groupsFromMuscleNames(exo.muscles), _DETAIL_MAP_UID);
-
+  if (muscles.length) {
+    highlightMuscles(document.getElementById('modal-body'), groupsFromMuscleNames(muscles), _DETAIL_MAP_UID);
+  }
   setTimeout(() => _loadGif(exo), 80);
-  setTimeout(() => _loadProgression(exo), 80);
+  setTimeout(() => _loadDetail(exo), 40);
 }
 
-function _progressionBaselineKey(exoNom) {
-  return `esse_prog_baseline_${currentUser.id}_${exoNom}`;
-}
-
-async function _loadProgression(exo) {
-  const wrap = document.getElementById('exo-progression');
-  if (!wrap) return;
-
+// Courbe, chiffres et dernières séances de l'exercice.
+async function _loadDetail(exo) {
+  const hero = document.getElementById('xd-hero');
+  if (!hero) return;
   try {
-    const { data: series, error } = await supabase
-      .from('series')
-      .select('poids_kg, repetitions, created_at, seance_id')
-      .eq('user_id', currentUser.id)
-      .eq('exercice_nom', exo.nom)
-      // Séries de travail uniquement (voir js/set-types.js).
-      .neq('type_serie', 'echauffement')
-      .not('poids_kg', 'is', null)
-      .not('repetitions', 'is', null)
-      .order('created_at', { ascending: true });
-    if (error) throw error;
-    if (!wrap.isConnected) return;
+    const series = await fetchAll(() => supabase.from('series')
+      .select('poids_kg, repetitions, duree_s, type_serie, created_at, seance_id')
+      .eq('user_id', currentUser.id).eq('exercice_nom', exo.nom)
+      .order('created_at', { ascending: true }));
+    if (!hero.isConnected) return;
+    const sessions = sessionsOf(series);
 
-    if (!series?.length) {
-      wrap.innerHTML = `<p style="color:var(--text-muted);font-size:var(--font-size-sm);text-align:center;padding:var(--space-4) 0">Aucune donnée enregistrée pour cet exercice.</p>`;
+    if (!sessions.length) {
+      hero.innerHTML = `
+        <p class="xd-hero-label">Pas encore fait</p>
+        <p class="xd-empty">Ta courbe de progression, tes records et tes dernières séances apparaîtront ici dès que tu auras fait cet exercice.</p>`;
       return;
     }
 
-    // Regrouper par séance (et non par jour calendaire) → meilleur 1RM et
-    // poids max par séance, sinon deux séances le même jour s'écrasent en
-    // un seul point et la progression entre les deux disparaît.
-    const bySeance = {};
-    for (const s of series) {
-      const key = s.seance_id;
-      const orm = calc1RM(s.poids_kg, s.repetitions);
-      if (!bySeance[key]) bySeance[key] = { date: s.created_at, orm: 0, poids: 0 };
-      if (s.created_at < bySeance[key].date) bySeance[key].date = s.created_at;
-      if (orm > bySeance[key].orm)         bySeance[key].orm   = orm;
-      if (s.poids_kg > bySeance[key].poids) bySeance[key].poids = s.poids_kg;
-    }
-    const points = Object.values(bySeance).sort((a, b) => a.date.localeCompare(b.date));
+    const sum = summarize(sessions);
+    const kg = sum.kg;
+    const metrics = kg
+      ? { e1rm: { label: '1RM estimé', pts: sessions.filter(g => g.best1RM).map(g => ({ t: g.t, y: g.best1RM })), best: sum.best.e1rm },
+          poids: { label: 'Charge max', pts: sessions.filter(g => g.maxPoids).map(g => ({ t: g.t, y: g.maxPoids })), best: sum.best.poids } }
+      : { duree: { label: 'Meilleur temps', pts: sessions.filter(g => g.maxDuree).map(g => ({ t: g.t, y: g.maxDuree })), best: sum.best.duree } };
+    const fmt = kg ? (y) => `${fmtNum(y)} kg` : (y) => fmtDuree(y);
 
-    const baselineDate = lsGet(_progressionBaselineKey(exo.nom));
-    const basePoint = baselineDate
-      ? (points.find(p => p.date >= baselineDate) ?? points.at(-1))
-      : points[0];
-    const lastPoint   = points.at(-1);
-    const deltaPoids  = lastPoint.poids - basePoint.poids;
+    // Évolution sur ~3 mois : dernière séance comparée à la première
+    // séance des 90 derniers jours (ou à la toute première).
+    const delta = (pts) => {
+      if (pts.length < 2) return '';
+      const from = Date.now() - 90 * 86400000;
+      const base = pts.find(p => p.t >= from) ?? pts[0];
+      const last = pts.at(-1);
+      if (base === last) return '';
+      const d = last.y - base.y;
+      const days = (last.t - base.t) / 86400000;
+      const quand = days > 75 ? 'en 3 mois' : `depuis le ${fmtShortDate(base.t)}`;
+      const txt = kg ? `${d >= 0 ? '+' : '−'}${fmtNum(Math.abs(d))} kg` : `${d >= 0 ? '+' : '−'}${fmtDuree(Math.abs(d))}`;
+      return `<span class="xd-delta ${d > 0 ? 'is-up' : d < 0 ? 'is-down' : ''}">${txt} ${quand}</span>`;
+    };
 
-    wrap.innerHTML = `
-      <div style="display:flex;flex-direction:column;gap:var(--space-4)">
-        <div class="card" style="padding:var(--space-4)">
-          <p class="card-title" style="margin-bottom:var(--space-3)">1RM estimé dans le temps</p>
-          ${svgLineChart(points.map(p => ({ x: new Date(p.date).getTime(), y: p.orm })))}
-        </div>
-        <div class="card" style="padding:var(--space-4)">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:var(--space-3)">
-            <p class="card-title">Poids soulevé dans le temps</p>
-            <button class="section-link" id="exo-prog-reset" style="font-size:11px">Réinitialiser</button>
+    const draw = (key) => {
+      const m = metrics[key];
+      hero.innerHTML = `
+        <div class="xd-hero-top">
+          <div>
+            <p class="xd-hero-label">${m.label}${kg ? ' · record' : ''}</p>
+            <p class="xd-hero-value">${kg ? `${fmtNum(m.best)}<span> kg</span>` : fmtDuree(m.best)}</p>
           </div>
-          ${svgLineChart(points.map(p => ({ x: new Date(p.date).getTime(), y: p.poids })), { color: 'var(--color-success)' })}
-          <p style="font-size:var(--font-size-sm);margin-top:var(--space-3);font-weight:700;
-            color:${deltaPoids >= 0 ? 'var(--color-success)' : 'var(--color-error)'}">
-            ${deltaPoids >= 0 ? '+' : ''}${deltaPoids} kg depuis ${formatDate(basePoint.date)}
-          </p>
+          ${delta(m.pts)}
         </div>
-      </div>`;
+        ${kg ? `
+          <div class="seg seg-sm" role="tablist" aria-label="Courbe affichée">
+            ${Object.entries(metrics).map(([k, v]) => `<button role="tab" class="seg-btn ${k === key ? 'is-on' : ''}" aria-selected="${k === key}" data-xd-metric="${k}">${v.label}</button>`).join('')}
+          </div>` : ''}
+        ${m.pts.length > 1
+          ? lineChartHTML(m.pts, { fmt, bestLabel: 'record' })
+          : `<p class="xd-empty">Une seule séance pour l’instant : la courbe apparaîtra dès la prochaine.</p>`}`;
+      hero.querySelectorAll('[data-xd-metric]').forEach(b => b.addEventListener('click', () => draw(b.dataset.xdMetric)));
+    };
+    draw(kg ? 'e1rm' : 'duree');
 
-    wrap.querySelector('#exo-prog-reset')?.addEventListener('click', () => {
-      lsSet(_progressionBaselineKey(exo.nom), todayStr());
-      _loadProgression(exo);
-    });
-  } catch {
-    if (wrap.isConnected) {
-      wrap.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:var(--space-4)">Erreur de chargement</p>`;
+    const tiles = document.getElementById('xd-tiles');
+    if (tiles) {
+      tiles.innerHTML = kg ? `
+        <div class="xd-tile"><p class="xd-tile-val">${fmtNum(sum.best.poids)}<span> kg</span></p><p class="xd-tile-label">charge max</p></div>
+        <div class="xd-tile"><p class="xd-tile-val">${sum.best.serie ? `${fmtNum(sum.best.serie.poids)} × ${sum.best.serie.reps}` : '—'}</p><p class="xd-tile-label">meilleure série</p></div>
+        <div class="xd-tile"><p class="xd-tile-val">${Math.round(sum.best.volume).toLocaleString('fr-FR')}</p><p class="xd-tile-label">kg en une séance</p></div>`
+      : `
+        <div class="xd-tile"><p class="xd-tile-val">${fmtDuree(sum.best.duree)}</p><p class="xd-tile-label">meilleur temps</p></div>
+        <div class="xd-tile"><p class="xd-tile-val">${fmtDuree(sessions.at(-1).maxDuree)}</p><p class="xd-tile-label">dernière fois</p></div>
+        <div class="xd-tile"><p class="xd-tile-val">${sum.count}</p><p class="xd-tile-label">séance${sum.count > 1 ? 's' : ''}</p></div>`;
     }
+
+    const lastWrap = document.getElementById('xd-last-wrap');
+    const last = document.getElementById('xd-last');
+    if (last && lastWrap) {
+      const recordIds = new Set(sum.events.map(e => e.date));
+      last.innerHTML = sessions.slice(-5).reverse().map(g => {
+        const sets = g.sets.map(x => kg
+          ? (Number(x.poids_kg) > 0 ? `${fmtNum(x.poids_kg)}×${x.repetitions ?? '?'}` : null)
+          : (Number(x.duree_s) > 0 ? fmtDuree(x.duree_s) : null)).filter(Boolean);
+        return `
+          <div class="xd-last-row">
+            <span class="xd-last-date">${(d => d.charAt(0).toUpperCase() + d.slice(1))(fmtShortDate(g.date, { weekday: true }))}</span>
+            <span class="xd-last-sets">${recordIds.has(g.date) ? '<span class="rec-badge">Record</span>' : ''}${sets.join(' · ') || '—'}</span>
+          </div>`;
+      }).join('');
+      lastWrap.hidden = false;
+      if (kg) lastWrap.querySelector('.xd-h').innerHTML = 'Dernières fois <span>kg × réps</span>';
+    }
+  } catch (e) {
+    console.warn('[exercice]', e);
+    if (hero.isConnected) hero.innerHTML = `<p class="xd-empty">Erreur de chargement</p>`;
   }
 }
 

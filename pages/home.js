@@ -106,7 +106,6 @@ const WIDGETS = {
   greeting:       { label: 'Salutation',              render: _renderGreeting },
   goal:           { label: 'Objectif de la semaine',  render: _renderGoal },
   highlights:     { label: 'Chiffres clés',           render: _renderHighlights },
-  'week-stats':   { label: 'Stats de la semaine',     render: _renderWeekStats },
   'start-button': { label: 'Bouton démarrer',         render: _renderStartButton },
   muscles:        { label: 'Muscles travaillés',      render: _renderMuscles },
   'last-seances': { label: 'Dernières séances',       render: _renderLastSeancesWidget },
@@ -121,11 +120,11 @@ const DEFAULT_LAYOUT = [
   { id: 'highlights',    hidden: false },
   { id: 'last-seances',  hidden: false },
   { id: 'muscles',       hidden: false },
-  { id: 'week-stats',    hidden: true },
 ];
 // « Activité de la semaine » (doublon de la bande de jours de l'objectif)
 // et « Raccourcis » (doublon de la navigation du bas) ont été retirés :
 // une disposition enregistrée qui les contient les ignore simplement.
+// « Stats de la semaine » est fusionné dans « Chiffres clés ».
 
 function _renderGreeting(ctx) {
   return `
@@ -136,25 +135,6 @@ function _renderGreeting(ctx) {
       <p style="color:var(--text-secondary);font-size:var(--font-size-sm)">
         ${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
       </p>
-    </div>`;
-}
-
-function _renderWeekStats(ctx) {
-  const { seancesCount, totalMin, weekCalories } = ctx;
-  return `
-    <div class="grid-3 page-section" data-widget="week-stats">
-      <div class="card">
-        <p class="card-title">Séances</p>
-        <p class="card-value">${seancesCount}</p>
-      </div>
-      <div class="card">
-        <p class="card-title">Temps</p>
-        <p class="card-value">${totalMin >= 60 ? Math.floor(totalMin/60) + 'h' + String(totalMin%60).padStart(2,'0') : totalMin} <span>${totalMin >= 60 ? '' : 'min'}</span></p>
-      </div>
-      <div class="card">
-        <p class="card-title">Calories</p>
-        <p class="card-value">${weekCalories}<span> kcal</span></p>
-      </div>
     </div>`;
 }
 
@@ -186,20 +166,29 @@ function _renderGoal(ctx) {
     </div>`;
 }
 
+// Chiffres clés : un seul bloc pour le mois et la semaine. Le nombre de
+// séances de la semaine est déjà dans l'anneau d'objectif.
 function _renderHighlights(ctx) {
+  const m = ctx.totalMin;
+  const temps = m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}` : `${m}<span> min</span>`;
+  const vol = formatKg(ctx.monthVolume).replace(/\s?kg$/, '');
   return `
-    <div class="page-section highlight-row" data-widget="highlights">
-      <div class="highlight-pill">
-        <p class="highlight-value">${formatKg(ctx.monthVolume)}</p>
-        <p class="highlight-label">soulevés ce mois</p>
+    <div class="page-section kpi-card" data-widget="highlights">
+      <div class="kpi">
+        <p class="kpi-value">${vol}<span> kg</span></p>
+        <p class="kpi-label">soulevés ce mois · ${ctx.monthCount} séance${ctx.monthCount > 1 ? 's' : ''}</p>
       </div>
-      <div class="highlight-pill">
-        <p class="highlight-value">${ctx.monthCount}</p>
-        <p class="highlight-label">séance${ctx.monthCount > 1 ? 's' : ''} ce mois</p>
+      <div class="kpi">
+        <p class="kpi-value">${_SVG_FLAME}${ctx.streak}<span> sem.</span></p>
+        <p class="kpi-label">objectif tenu d’affilée</p>
       </div>
-      <div class="highlight-pill">
-        <p class="highlight-value">${_SVG_FLAME}${ctx.streak} sem.</p>
-        <p class="highlight-label">objectif tenu d'affilée</p>
+      <div class="kpi">
+        <p class="kpi-value">${temps}</p>
+        <p class="kpi-label">d’entraînement cette semaine</p>
+      </div>
+      <div class="kpi">
+        <p class="kpi-value">${ctx.weekCalories ? ctx.weekCalories.toLocaleString('fr-FR') : '—'}${ctx.weekCalories ? '<span> kcal</span>' : ''}</p>
+        <p class="kpi-label">dépensées cette semaine</p>
       </div>
     </div>`;
 }
