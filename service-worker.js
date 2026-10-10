@@ -1,12 +1,13 @@
-const CACHE_NAME = 'forme-v41';
+const CACHE_NAME = 'forme-v42';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/fonts/inter-latin.woff2',
+  '/fonts/space-grotesk-latin.woff2',
   '/css/variables.css',
   '/css/main.css',
   '/css/components.css',
+  '/css/pulse.css',
   '/js/app.js',
   '/js/config.js',
   '/js/router.js',

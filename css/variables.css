@@ -1,22 +1,22 @@
 /* ── Fonte locale ────────────────────────────────────────────────── */
-/* Inter variable (400→900), sous-ensemble latin — couvre le français,
-   œ et le symbole € compris. Servie depuis le dépôt plutôt que depuis
-   Google Fonts : mise en cache par le service worker, elle survit au
-   mode hors-ligne, qui est précisément le cas d'usage en salle. */
+/* Space Grotesk variable (300→700), sous-ensemble latin — couvre le
+   français, œ et le symbole €. Servie depuis le dépôt et mise en cache
+   par le service worker : hors-ligne, l'app garde sa typographie.
+   Licence SIL OFL 1.1 (The Space Grotesk Project Authors). */
 @font-face {
-  font-family: 'Inter';
+  font-family: 'Space Grotesk';
   font-style: normal;
-  font-weight: 400 900;
+  font-weight: 300 700;
   font-display: swap;
-  src: url('../fonts/inter-latin.woff2') format('woff2');
+  src: url('../fonts/space-grotesk-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
                  U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F,
                  U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-/* ── Tokens globaux ──────────────────────────────────────────────── */
+/* ── Tokens globaux — charte « Pulse » ───────────────────────────── */
 :root {
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
   /* Échelle typographique */
   --font-size-xs:  0.6875rem;  /* 11px */
@@ -24,18 +24,17 @@
   --font-size-md:  0.9375rem;  /* 15px */
   --font-size-lg:  1.0625rem;  /* 17px */
   --font-size-xl:  1.25rem;    /* 20px */
-  --font-size-2xl: 1.5625rem;  /* 25px */
-  --font-size-3xl: 2rem;       /* 32px */
-  --font-size-4xl: 2.75rem;    /* 44px */
+  --font-size-2xl: 1.625rem;   /* 26px */
+  --font-size-3xl: 2.25rem;    /* 36px */
+  --font-size-4xl: 3rem;       /* 48px */
 
-  /* Rayon — resserré : des angles moins ronds tiennent mieux la densité
-     et vieillissent mieux que les grands arrondis. --radius-full reste
-     entier, il sert aux pastilles et aux avatars, qui sont des cercles. */
-  --radius-sm:   6px;
-  --radius-md:   10px;
-  --radius-lg:   12px;
-  --radius-xl:   14px;
-  --radius-2xl:  18px;
+  /* Rayons — plus généreux que l'ancienne charte : les surfaces sont
+     des blocs pleins sans bordure, l'arrondi fait le travail du trait. */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   14px;
+  --radius-xl:   16px;
+  --radius-2xl:  20px;
   --radius-full: 9999px;
 
   /* Espacement */
@@ -49,9 +48,11 @@
   --space-10: 2.5rem;
   --space-12: 3rem;
 
-  /* Dimensions */
-  --header-height: 54px;
-  --nav-height:    68px;
+  /* Dimensions — la navigation flotte : --nav-height réserve la place
+     de la pastille (56px) et de sa marge basse (14px) plus un souffle. */
+  --header-height: 56px;
+  --nav-height:    84px;
+  --nav-pill:      56px;
   --safe-bottom:   env(safe-area-inset-bottom, 0px);
 
   /* Transitions */
@@ -61,130 +62,118 @@
   --transition-sheet:  340ms cubic-bezier(0.32, 0.72, 0, 1);
 
   /* Couleurs d'état */
-  --color-success:       #22C55E;
-  --color-success-light: rgba(34, 197, 94, 0.12);
-  --color-warning:       #F59E0B;
-  --color-warning-light: rgba(245, 158, 11, 0.12);
-  --color-error:         #EF4444;
-  --color-error-light:   rgba(239, 68, 68, 0.12);
-  --color-info:          #3B82F6;
-  --color-info-light:    rgba(59, 130, 246, 0.12);
+  --color-success:       #3DDC84;
+  --color-success-light: rgba(61, 220, 132, 0.14);
+  --color-warning:       #F5B43C;
+  --color-warning-light: rgba(245, 180, 60, 0.14);
+  --color-error:         #FF5A5F;
+  --color-error-light:   rgba(255, 90, 95, 0.14);
+  --color-info:          #3D7BFF;
+  --color-info-light:    rgba(61, 123, 255, 0.14);
 
-  /* ── Accent or — sobre et classe, calqué sur la charte Forme ── */
-  --color-primary:        #C9A35C;
-  --color-primary-hover:  #B08D49;
-  --color-primary-light:  rgba(201, 163, 92, 0.12);
+  /* ── Accent — réglable dans Apparence (js/app.js écrase ces valeurs) ── */
+  --color-primary:        #FF4D29;
+  --color-primary-hover:  #D13F22;
+  --color-primary-light:  rgba(255, 77, 41, 0.14);
+  --color-primary-ink:    #121212;   /* texte posé sur l'accent */
 
-  /* Les lueurs colorées sont neutralisées plutôt que supprimées de
-     chaque règle : les `box-shadow: 0 0 10px var(--color-primary-glow)`
-     disséminés dans le CSS deviennent invisibles sans qu'il faille les
-     traquer un par un — et se rallument en changeant ces deux lignes. */
+  /* Mise en avant — réservée aux records et réussites */
+  --color-highlight:       #C8FF4D;
+  --color-highlight-light: rgba(200, 255, 77, 0.12);
+  --color-highlight-ink:   #121212;
+
+  /* Pas de lueurs ni de dégradés : ces jetons restent valides partout
+     où l'ancien CSS les consomme, mais rendent un aplat. */
   --color-primary-glow:   transparent;
   --color-primary-glow-s: transparent;
-
-  /* Aplat plutôt que dégradé. Ces jetons restent des `background`
-     valides partout où ils étaient consommés : un or franc, sans la
-     rampe sombre→clair qui datait l'interface. */
   --color-primary-grad:   var(--color-primary);
   --color-primary-grad-v: var(--color-primary);
+  --shadow-accent:    none;
+  --shadow-accent-sm: none;
 
-  /* L'élévation redevient neutre : une ombre portée noire discrète au
-     lieu d'un halo doré. Les valeurs viennent du thème actif. */
-  --shadow-accent:    var(--shadow-md);
-  --shadow-accent-sm: var(--shadow-sm);
-
-  /* ── Validation ──────────────────────────────────────────────────
-     Une série cochée n'est pas une action de marque : elle a sa propre
-     couleur, pour que l'or ne signale plus qu'une seule chose. Les
-     valeurs sont définies par thème (contraste différent sur charbon
-     et sur crème). */
+  /* Une série validée prend la couleur d'accent : c'est la progression. */
+  --color-validated:       var(--color-primary);
+  --color-validated-light: var(--color-primary-light);
+  --color-validated-ink:   var(--color-primary-ink);
 }
 
-/* ── Thème sombre (défaut) ──────────────────────────────────────── */
+/* ── Thème sombre (défaut) — fond encre ─────────────────────────── */
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* Charbon chaud — plus classe que le quasi-noir froid d'avant */
-  --background:    #0E0C0A;
-  --bg-secondary:  #131110;
-  --surface:       #181614;
-  --surface-2:     #1F1C19;
-  --surface-3:     #28241F;
-  --surface-4:     #312C25;
+  --background:    #121212;
+  --bg-secondary:  #161616;
+  --surface:       #1B1B1B;
+  --surface-2:     #232323;
+  --surface-3:     #2A2A2A;
+  --surface-4:     #343434;
 
-  /* Bordures fines mais perceptibles */
   --border:        rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.12);
-  --border-focus:  rgba(201, 163, 92, 0.55);
-  --border-ember:  rgba(201, 163, 92, 0.28);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --border-focus:  rgba(255, 77, 41, 0.55);
+  --border-ember:  rgba(255, 77, 41, 0.30);
 
-  --text-primary:   #F2EFE9;
-  --text-secondary: rgba(242, 239, 233, 0.52);
-  --text-muted:     rgba(242, 239, 233, 0.26);
-  --text-inverse:   #0E0C0A;
+  --text-primary:   #F5F5F0;
+  --text-secondary: rgba(245, 245, 240, 0.68);
+  --text-muted:     rgba(245, 245, 240, 0.50);
+  --text-inverse:   #121212;
 
-  /* Vert de validation — désaturé pour cohabiter avec le charbon chaud */
-  --color-validated:       #4E8C63;
-  --color-validated-light: rgba(78, 140, 99, 0.14);
-  --color-validated-ink:   #FFFFFF;
+  --shadow-sm:  0 1px 4px  rgba(0, 0, 0, 0.55);
+  --shadow-md:  0 6px 24px rgba(0, 0, 0, 0.60);
+  --shadow-lg:  0 10px 40px rgba(0, 0, 0, 0.70);
+  --shadow-xl:  0 16px 64px rgba(0, 0, 0, 0.80);
 
-  --shadow-sm:  0 1px 4px  rgba(0, 0, 0, 0.65);
-  --shadow-md:  0 4px 20px rgba(0, 0, 0, 0.72);
-  --shadow-lg:  0 8px 40px rgba(0, 0, 0, 0.80);
-  --shadow-xl:  0 16px 64px rgba(0, 0, 0, 0.90);
+  --scrollbar-thumb: #343434;
+  --scrollbar-track: #161616;
 
-  --scrollbar-thumb: #312C25;
-  --scrollbar-track: #131110;
-
-  --nav-bg:       rgba(14, 12, 10, 0.98);
-  --header-bg:    rgba(14, 12, 10, 0.96);
-  --glass-bg:     rgba(24, 22, 20, 0.92);
+  --nav-bg:       rgba(27, 27, 27, 0.96);
+  --header-bg:    #121212;
+  --glass-bg:     rgba(27, 27, 27, 0.94);
   --glass-border: rgba(255, 255, 255, 0.07);
 
-  --chart-grid:  rgba(255, 255, 255, 0.04);
-  --chart-line:  #C9A35C;
+  --chart-grid:  rgba(255, 255, 255, 0.05);
+  --chart-line:  var(--color-primary);
 }
 
-/* ── Thème clair ────────────────────────────────────────────────── */
+/* ── Thème clair — même structure, fond craie ───────────────────── */
 [data-theme="light"] {
   color-scheme: light;
 
-  --background:    #F4EFE6;
-  --bg-secondary:  #EAE3D3;
-  --surface:       #FCFAF5;
-  --surface-2:     #F4EFE6;
-  --surface-3:     #EAE3D3;
-  --surface-4:     #DED5BE;
+  --background:    #F2F2EE;
+  --bg-secondary:  #E9E9E4;
+  --surface:       #FFFFFF;
+  --surface-2:     #F2F2EE;
+  --surface-3:     #E4E4DE;
+  --surface-4:     #D6D6CF;
 
   --border:        rgba(0, 0, 0, 0.07);
-  --border-strong: rgba(0, 0, 0, 0.13);
-  --border-focus:  rgba(201, 163, 92, 0.55);
-  --border-ember:  rgba(201, 163, 92, 0.30);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --border-focus:  rgba(255, 77, 41, 0.55);
+  --border-ember:  rgba(255, 77, 41, 0.30);
 
-  --text-primary:   #1C1813;
-  --text-secondary: rgba(28, 24, 19, 0.55);
-  --text-muted:     rgba(28, 24, 19, 0.32);
-  --text-inverse:   #FCFAF5;
+  --text-primary:   #121212;
+  --text-secondary: rgba(18, 18, 18, 0.68);
+  --text-muted:     rgba(18, 18, 18, 0.52);
+  --text-inverse:   #FFFFFF;
 
-  /* Plus foncé qu'en thème sombre : il doit tenir le contraste du texte
-     blanc posé dessus, sur un fond crème clair. */
-  --color-validated:       #3E7350;
-  --color-validated-light: rgba(62, 115, 80, 0.13);
-  --color-validated-ink:   #FCFAF5;
+  /* En clair, le citron manque de contraste : on garde un vert franc. */
+  --color-highlight:       #2E9E5B;
+  --color-highlight-light: rgba(46, 158, 91, 0.12);
+  --color-highlight-ink:   #FFFFFF;
 
   --shadow-sm:  0 1px 3px  rgba(0, 0, 0, 0.08);
-  --shadow-md:  0 4px 16px rgba(0, 0, 0, 0.10);
-  --shadow-lg:  0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-md:  0 6px 20px rgba(0, 0, 0, 0.10);
+  --shadow-lg:  0 10px 32px rgba(0, 0, 0, 0.12);
   --shadow-xl:  0 16px 56px rgba(0, 0, 0, 0.14);
 
-  --scrollbar-thumb: #DED5BE;
-  --scrollbar-track: #EAE3D3;
+  --scrollbar-thumb: #D6D6CF;
+  --scrollbar-track: #E9E9E4;
 
-  --nav-bg:     rgba(244, 239, 230, 0.96);
-  --header-bg:  rgba(244, 239, 230, 0.92);
-  --glass-bg:   rgba(252, 250, 245, 0.88);
+  --nav-bg:       rgba(255, 255, 255, 0.96);
+  --header-bg:    #F2F2EE;
+  --glass-bg:     rgba(255, 255, 255, 0.92);
   --glass-border: rgba(0, 0, 0, 0.08);
 
-  --chart-grid:  rgba(0, 0, 0, 0.04);
-  --chart-line:  #C9A35C;
+  --chart-grid:  rgba(0, 0, 0, 0.05);
+  --chart-line:  var(--color-primary);
 }

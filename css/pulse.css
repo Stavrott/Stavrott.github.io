@@ -1,0 +1,197 @@
+/* ══════════════════════════════════════════════════════════════════
+   Charte « Pulse » — surcouche chargée après main.css et components.css
+   ──────────────────────────────────────────────────────────────────
+   Les couleurs viennent des jetons de variables.css (et de l'accent
+   choisi dans Apparence). Cette feuille ne fait que réaligner les
+   composants existants : aplats sans bordure, pas de lueur, navigation
+   flottante, boutons d'action en capitales.
+   ══════════════════════════════════════════════════════════════════ */
+
+body {
+  font-family: var(--font-family);
+  background: var(--background);
+}
+
+/* ── Écran de connexion ─────────────────────────────────────────── */
+.auth-screen::before,
+.auth-screen::after { display: none; }
+.auth-logo-icon { width: 88px; height: 88px; margin-bottom: var(--space-4); }
+.auth-app-icon { width: 88px; height: 88px; filter: none; }
+.auth-logo h1 { font-weight: 700; letter-spacing: 0.3em; }
+.auth-card {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: var(--space-4) 0 0;
+}
+.auth-input,
+.form-input {
+  background: var(--surface);
+  border: 1.5px solid var(--surface-3);
+  border-radius: var(--radius-lg);
+  min-height: 50px;
+}
+.auth-input:focus,
+.form-input:focus {
+  border-color: var(--border-focus);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+.btn-auth {
+  background: var(--color-primary);
+  color: var(--color-primary-ink);
+  box-shadow: none;
+}
+.btn-auth:hover { filter: brightness(1.06); }
+
+/* ── En-tête : plus de barre, le fond est continu ──────────────── */
+.app-header {
+  background: var(--header-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: none;
+}
+.page-title { font-weight: 700; font-size: var(--font-size-lg); letter-spacing: 0; }
+.header-logo { color: var(--color-primary); }
+
+/* ── Navigation flottante : pastille centrée, icônes seules ──────── */
+.bottom-nav {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  bottom: calc(var(--safe-bottom) + 14px);
+  height: var(--nav-pill);
+  padding: 0 var(--space-3);
+  gap: var(--space-2);
+  align-items: center;
+  background: var(--nav-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+}
+.nav-item {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  gap: 0;
+  border-radius: var(--radius-full);
+}
+/* Les libellés restent dans le DOM pour les lecteurs d'écran. */
+.nav-item span {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.nav-item svg { width: 22px; height: 22px; }
+.nav-item.active svg { filter: none; transform: none; }
+.nav-item.active::after {
+  top: auto;
+  bottom: 5px;
+  width: 4px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  box-shadow: none;
+}
+
+/* ── Boutons ───────────────────────────────────────────────────── */
+.btn { border-radius: var(--radius-lg); font-weight: 700; }
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-primary-ink);
+  box-shadow: none;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.btn-primary:hover { filter: brightness(1.06); box-shadow: none; }
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+}
+.btn-success {
+  background: var(--color-primary);
+  color: var(--color-primary-ink);
+  box-shadow: none;
+}
+
+/* ── Cartes : aplats sans bordure ──────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: none;
+  border-radius: var(--radius-2xl);
+}
+.card-interactive:hover { background: var(--surface-2); }
+.card-accent {
+  background: var(--color-primary);
+  box-shadow: none;
+}
+.card-accent::after { display: none; }
+.card-accent .card-label { color: var(--color-primary-ink); opacity: 0.7; }
+.card-accent .card-value { color: var(--color-primary-ink); }
+.card-accent .card-unit  { color: var(--color-primary-ink); opacity: 0.6; }
+.card-value { font-weight: 700; letter-spacing: -0.01em; }
+.card-label { letter-spacing: 0.08em; }
+
+.list-item { background: var(--surface); border-radius: var(--radius-xl); }
+
+/* ── Onglets : segment en pastille ─────────────────────────────── */
+.tabs,
+.tabs-bar {
+  gap: 0;
+  padding: 4px;
+  border-bottom: none;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+}
+.tab,
+.tab-item {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: none;
+  margin-bottom: 0;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+.tab.active,
+.tab-item.active {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+/* ── Puces de filtre : la sélection est pleine ────────────────── */
+.chip {
+  border: none;
+  background: var(--surface);
+  color: var(--text-secondary);
+  min-height: 36px;
+  padding: 0 var(--space-4);
+}
+.chip.active {
+  background: var(--text-primary);
+  color: var(--background);
+}
+
+/* ── Séance : séries, minuteur ─────────────────────────────────── */
+.exercise-card-header::before { box-shadow: none; }
+.set-timer-active { background: var(--color-primary-light) !important; }
+@keyframes timer-finish-flash {
+  0%, 100% { background: transparent; }
+  30%       { background: var(--color-primary-light); }
+}
+.timer-sheet { box-shadow: 0 -12px 52px rgba(0, 0, 0, 0.6); }
+.timer-ring-fill { stroke: var(--color-primary); filter: none; }
+.timer-ring-fill.warning { filter: none; }
+.timer-ring-fill.done    { filter: none; }
+
+.progress-fill { background: var(--color-primary); }
+
+/* Records et réussites : couleur de mise en avant */
+.badge-success {
+  background: var(--color-highlight-light);
+  color: var(--color-highlight);
+}

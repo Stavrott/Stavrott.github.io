@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#0E0C0A" id="theme-meta">
+  <meta name="theme-color" content="#121212" id="theme-meta">
   <meta name="description" content="Application de suivi de musculation">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17,14 +17,15 @@
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 
-  <!-- Inter est servie depuis le dépôt et mise en cache par le service
+  <!-- Space Grotesk est servie depuis le dépôt et mise en cache par le service
        worker : hors-ligne, l'app garde sa typographie. Le préchargement
        évite le bref rendu en police système au premier affichage. -->
-  <link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/space-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
 
   <link rel="stylesheet" href="css/variables.css">
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/pulse.css">
 </head>
 <body>
 
@@ -36,7 +37,12 @@
 
         <div class="auth-logo">
           <div class="auth-logo-icon">
-            <img src="icons/logo.png" alt="Forme" class="auth-app-icon">
+            <svg class="auth-app-icon" viewBox="0 0 64 64" fill="none" stroke="var(--color-primary)" stroke-width="3" stroke-linecap="round" role="img" aria-label="Forme">
+              <circle cx="32" cy="32" r="27"/>
+              <circle cx="32" cy="32" r="9"/>
+              <ellipse cx="13" cy="32" rx="4" ry="6" fill="var(--color-primary)" stroke="none"/>
+              <ellipse cx="51" cy="32" rx="4" ry="6" fill="var(--color-primary)" stroke="none"/>
+            </svg>
           </div>
           <h1>FORME</h1>
         </div>

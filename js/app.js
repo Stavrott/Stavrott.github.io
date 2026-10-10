@@ -21,25 +21,22 @@ import { initActiveBar }        from './active-bar.js';
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   const meta = document.getElementById('theme-meta');
-  if (meta) meta.content = theme === 'dark' ? '#0E0C0A' : '#F4EFE6';
+  if (meta) meta.content = theme === 'dark' ? '#121212' : '#F2F2EE';
   lsSet('theme', theme);
 }
 
 // ── Couleur d'accent ────────────────────────────────────────────────
-// Variantes sobres des couleurs classiques — pas de fluo, des teintes
-// profondes/désaturées qui restent lisibles en thème sombre et clair.
+// Charte « Pulse » : des accents francs, lisibles sur le fond encre.
+// Le texte posé sur l'accent (--color-primary-ink) est choisi selon la
+// luminance de la couleur, pour que les boutons restent lisibles.
 
 const ACCENT_PALETTES = [
-  { id: 'or',         label: 'Or (défaut)',     hex: '#C9A35C' },
-  { id: 'braise',     label: 'Braise',          hex: '#E83000' },
-  { id: 'bordeaux',   label: 'Bordeaux',        hex: '#7A2E38' },
-  { id: 'marine',     label: 'Marine',          hex: '#1E3A5F' },
-  { id: 'emeraude',   label: 'Émeraude',        hex: '#2F6B4F' },
-  { id: 'aubergine',  label: 'Aubergine',       hex: '#5B3A6E' },
-  { id: 'petrole',    label: 'Pétrole',         hex: '#1F5B5B' },
-  { id: 'terracotta', label: 'Terracotta',      hex: '#A6633C' },
-  { id: 'vieux-rose', label: 'Vieux rose',      hex: '#9C5564' },
-  { id: 'ardoise',    label: 'Ardoise',         hex: '#51596B' },
+  { id: 'signal',  label: 'Orange signal (défaut)', hex: '#FF4D29' },
+  { id: 'bleu',    label: 'Bleu électrique',        hex: '#3D7BFF' },
+  { id: 'violet',  label: 'Violet',                 hex: '#B18CFF' },
+  { id: 'citron',  label: 'Citron',                 hex: '#C8FF4D' },
+  { id: 'or',      label: 'Or',                     hex: '#C9A35C' },
+  { id: 'menthe',  label: 'Menthe',                 hex: '#3DDCB4' },
 ];
 const DEFAULT_ACCENT = ACCENT_PALETTES[0].hex;
 
@@ -57,6 +54,15 @@ function _rgba(hex, a) {
   const [r, g, b] = _hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
+// Luminance relative (WCAG) : au-dessus de 0,18, un texte encre sur
+// l'accent contraste mieux qu'un texte blanc.
+function _inkFor(hex) {
+  const L = _hexToRgb(hex)
+    .map(c => c / 255)
+    .map(c => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
+  const lum = 0.2126 * L[0] + 0.7152 * L[1] + 0.0722 * L[2];
+  return lum > 0.18 ? '#121212' : '#FFFFFF';
+}
 
 // L'accent est appliqué en aplat : ni dégradé, ni halo coloré. Les jetons
 // de lueur et d'ombre accent ne sont volontairement plus écrits ici — ils
@@ -69,7 +75,8 @@ function applyAccent(hex) {
 
   root.setProperty('--color-primary',       hex);
   root.setProperty('--color-primary-hover', hover);
-  root.setProperty('--color-primary-light', _rgba(hex, 0.12));
+  root.setProperty('--color-primary-light', _rgba(hex, 0.14));
+  root.setProperty('--color-primary-ink',   _inkFor(hex));
   root.setProperty('--color-primary-grad',  hex);
   root.setProperty('--color-primary-grad-v',hex);
   root.setProperty('--border-focus',        _rgba(hex, 0.58));
@@ -83,7 +90,15 @@ function initTheme() {
   const saved = lsGet('theme');
   const preferred = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   applyTheme(saved || preferred);
-  applyAccent(lsGet('accent') || DEFAULT_ACCENT);
+  // Passage à la charte Pulse : l'ancien or par défaut (enregistré pour
+  // tout le monde au premier lancement) bascule une seule fois sur le
+  // nouvel accent. Un accent choisi volontairement est conservé.
+  let accent = lsGet('accent');
+  if (!lsGet('pulse_migrated')) {
+    if (!accent || accent.toLowerCase() === '#c9a35c') accent = DEFAULT_ACCENT;
+    lsSet('pulse_migrated', '1');
+  }
+  applyAccent(accent || DEFAULT_ACCENT);
 
   document.getElementById('appearance-btn')?.addEventListener('click', _openAppearanceModal);
 }
