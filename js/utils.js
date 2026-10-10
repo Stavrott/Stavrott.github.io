@@ -115,8 +115,16 @@ export function formatWeight(kg) {
   return kg % 1 === 0 ? `${kg} kg` : `${kg.toFixed(1)} kg`;
 }
 
+// Date du jour au format AAAA-MM-JJ, en heure locale. (toISOString()
+// donne l'heure UTC : en France, une séance lancée entre minuit et 2 h
+// était rangée la veille.)
+export function localDateStr(d = new Date()) {
+  const x = d instanceof Date ? d : new Date(d);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+}
+
 export function todayStr() {
-  return new Date().toISOString().split('T')[0];
+  return localDateStr();
 }
 
 export function getGreeting() {

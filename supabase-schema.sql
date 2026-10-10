@@ -241,3 +241,8 @@ select cron.schedule(
   );
   $$
 );
+
+-- Refonte Pulse (voir supabase/migrations/20261010_pulse_rappels_records.sql)
+alter table public.profils add column if not exists jours_prevus smallint[] not null default '{}';
+alter table public.profils add column if not exists rappel_heure text;
+alter table public.seances add column if not exists records jsonb;

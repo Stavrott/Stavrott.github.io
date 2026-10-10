@@ -15,6 +15,8 @@ import { initTimer }       from '../components/timer.js';
 import { initOnboarding, checkOnboardingDone, resetOnboardingDone } from '../pages/onboarding.js';
 import { openQuickLaunchModal } from './quick-launch.js';
 import { initActiveBar }        from './active-bar.js';
+import { initSyncQueue }        from './sync-queue.js';
+import { initReminders }        from './reminders.js';
 
 // ── Thème ────────────────────────────────────────────────────────────
 
@@ -379,6 +381,8 @@ function _launchApp() {
   initRouter();
   initQuickLaunchLongPress();
   initActiveBar();
+  initSyncQueue();
+  initReminders();
 }
 
 // ── Appui long sur l'onglet "Séances" → lancement rapide d'une routine ─

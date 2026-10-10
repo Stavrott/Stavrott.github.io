@@ -1,7 +1,8 @@
 import { currentUser, getUserPrenom } from '../js/auth.js';
+import { getPlanning, getPlanningCached, savePlanning, JOURS_COURTS, JOURS_LONGS } from '../js/reminders.js';
 import { supabase }                   from '../js/supabase.js';
 import { navigate }                   from '../js/router.js';
-import { formatDate, getGreeting, todayStr, formatDuration, showToast, confirmDialog, escapeHtml, openModal, closeModal } from '../js/utils.js';
+import { formatDate, getGreeting, todayStr, formatDuration, showToast, confirmDialog, escapeHtml, openModal, closeModal, localDateStr } from '../js/utils.js';
 import { openQuickLaunchModal }       from '../js/quick-launch.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 import {
@@ -14,7 +15,7 @@ import {
 async function fetchDashboard(userId) {
   const today = todayStr();
   const dow = new Date().getDay();
-  const weekStart = new Date(Date.now() - (dow === 0 ? 6 : dow - 1) * 86400000).toISOString().split('T')[0];
+  const weekStart = localDateStr(new Date(Date.now() - (dow === 0 ? 6 : dow - 1) * 86400000));
 
   // Douze semaines de dates suffisent pour la série « objectif tenu ».
   const since = localKey(addDays(mondayOf(), -7 * 11));
@@ -106,9 +107,7 @@ const WIDGETS = {
   goal:           { label: 'Objectif de la semaine',  render: _renderGoal },
   highlights:     { label: 'Chiffres clés',           render: _renderHighlights },
   'week-stats':   { label: 'Stats de la semaine',     render: _renderWeekStats },
-  'week-activity': { label: 'Activité de la semaine', render: _renderWeekActivity },
   'start-button': { label: 'Bouton démarrer',         render: _renderStartButton },
-  shortcuts:      { label: 'Raccourcis',              render: _renderShortcuts },
   muscles:        { label: 'Muscles travaillés',      render: _renderMuscles },
   'last-seances': { label: 'Dernières séances',       render: _renderLastSeancesWidget },
 };
@@ -122,10 +121,11 @@ const DEFAULT_LAYOUT = [
   { id: 'highlights',    hidden: false },
   { id: 'last-seances',  hidden: false },
   { id: 'muscles',       hidden: false },
-  { id: 'shortcuts',     hidden: true },
   { id: 'week-stats',    hidden: true },
-  { id: 'week-activity', hidden: true },
 ];
+// « Activité de la semaine » (doublon de la bande de jours de l'objectif)
+// et « Raccourcis » (doublon de la navigation du bas) ont été retirés :
+// une disposition enregistrée qui les contient les ignore simplement.
 
 function _renderGreeting(ctx) {
   return `
@@ -158,16 +158,6 @@ function _renderWeekStats(ctx) {
     </div>`;
 }
 
-function _renderWeekActivity(ctx) {
-  return `
-    <div class="card page-section" data-widget="week-activity">
-      <p class="card-title" style="margin-bottom:var(--space-3)">Activité de la semaine</p>
-      <div class="week-dots" style="justify-content:space-around">
-        ${renderWeekDots(ctx.dash.seancesWeek)}
-      </div>
-    </div>`;
-}
-
 function _renderMuscles(ctx) {
   if (!ctx.weekMuscles.length) return '';
   return `
@@ -192,7 +182,7 @@ function _renderGoal(ctx) {
           <button class="goal-edit" id="btn-edit-goal">${_SVG_PENCIL}Objectif : ${ctx.goal} / semaine</button>
         </div>
       </div>
-      ${weekStripHTML(ctx.recent)}
+      ${weekStripHTML(ctx.recent, ctx.jours ?? getPlanningCached().jours)}
     </div>`;
 }
 
@@ -218,8 +208,14 @@ function _renderHighlights(ctx) {
 // L'objectif est la « fréquence » du profil (déjà demandée à l'onboarding),
 // désormais réglable de 1 à 7 séances par semaine.
 
-function _openGoalModal() {
+async function _openGoalModal() {
   let n = _dashCtx.goal;
+  let plan = { jours: [], heure: null };
+  try { plan = await getPlanning(); } catch {}
+  let jours = [...plan.jours];
+  let rappel = !!plan.heure;
+  let heure  = plan.heure || '08:30';
+
   const body = () => `
     <div class="goal-editor">
       <p class="goal-editor-label">Séances par semaine</p>
@@ -230,6 +226,23 @@ function _openGoalModal() {
       </div>
       <p class="goal-editor-level">${GOAL_LEVELS[n][0]}</p>
       <p class="goal-editor-desc">${GOAL_LEVELS[n][1]}</p>
+    </div>
+
+    <div class="goal-plan">
+      <p class="goal-editor-label">Mes jours d’entraînement <span>(facultatif)</span></p>
+      <div class="day-chips" role="group" aria-label="Jours d’entraînement">
+        ${JOURS_COURTS.map((j, d) => `
+          <button type="button" class="day-chip ${jours.includes(d) ? 'is-on' : ''}" data-day="${d}"
+            aria-pressed="${jours.includes(d)}" aria-label="${JOURS_LONGS[d]}">${j}</button>`).join('')}
+      </div>
+      <label class="goal-remind">
+        <input type="checkbox" id="goal-remind" ${rappel ? 'checked' : ''} ${jours.length ? '' : 'disabled'}>
+        <span>Me rappeler ces jours-là à</span>
+        <input type="time" class="form-input goal-remind-time" id="goal-remind-time" value="${heure}" ${rappel && jours.length ? '' : 'disabled'}>
+      </label>
+      <p class="goal-plan-hint">${jours.length
+        ? 'Le rappel arrive même appli fermée, sauf si tu as déjà fait ta séance ce jour-là.'
+        : 'Choisis tes jours pour recevoir un rappel ces jours-là.'}</p>
     </div>`;
 
   openModal({
@@ -245,21 +258,44 @@ function _openGoalModal() {
   // toutes les modales, un écouteur ajouté à chaque ouverture s'empilerait.
   mb.onclick = (e) => {
     const b = e.target.closest('[data-goal-step]');
-    if (!b) return;
-    n = Math.max(1, Math.min(7, n + parseInt(b.dataset.goalStep, 10)));
+    const d = e.target.closest('[data-day]');
+    if (b) n = Math.max(1, Math.min(7, n + parseInt(b.dataset.goalStep, 10)));
+    else if (d) {
+      const k = parseInt(d.dataset.day, 10);
+      jours = jours.includes(k) ? jours.filter(x => x !== k) : [...jours, k].sort();
+      // L'objectif suit le nombre de jours choisis (modifiable ensuite).
+      if (jours.length) n = jours.length;
+    } else return;
     mb.innerHTML = body();
   };
-  const done = () => { mb.onclick = null; closeModal(); };
+  mb.onchange = (e) => {
+    if (e.target.id === 'goal-remind') { rappel = e.target.checked; mb.innerHTML = body(); }
+    if (e.target.id === 'goal-remind-time') heure = e.target.value || '08:30';
+  };
+  const done = () => { mb.onclick = null; mb.onchange = null; closeModal(); };
 
   document.getElementById('btn-goal-cancel')?.addEventListener('click', done);
   document.getElementById('btn-goal-save')?.addEventListener('click', async () => {
+    heure = document.getElementById('goal-remind-time')?.value || heure;
     try {
       const { error } = await supabase.from('profils')
         .upsert({ user_id: currentUser.id, frequence: n }, { onConflict: 'user_id' });
       if (error) throw error;
+      const wantRemind = rappel && jours.length > 0;
+      if (wantRemind && 'Notification' in window && Notification.permission === 'default') {
+        try { await Notification.requestPermission(); } catch {}
+      }
       done();
-      showToast('Objectif enregistré', 'success');
+      const changed = JSON.stringify(plan.jours) !== JSON.stringify(jours) || (plan.heure || null) !== (wantRemind ? heure : null);
+      if (changed) {
+        const ok = await savePlanning({ jours, heure: wantRemind ? heure : null });
+        if (wantRemind && !ok) showToast('Objectif enregistré. Active les notifications pour recevoir les rappels.', 'warning', 5000);
+        else showToast('Objectif enregistré', 'success');
+      } else {
+        showToast('Objectif enregistré', 'success');
+      }
       _dashCtx.goal   = n;
+      _dashCtx.jours  = jours;
       _dashCtx.streak = goalStreakWeeks(_dashCtx.recent, n);
       _render();
     } catch {
@@ -280,48 +316,6 @@ function _renderStartButton() {
     </div>`;
 }
 
-function _renderShortcuts() {
-  return `
-    <div class="grid-2 page-section" data-widget="shortcuts">
-      <button class="card card-interactive" data-nav="programmes" style="text-align:left">
-        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
-          <div class="item-icon" style="width:36px;height:36px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          </div>
-          <span style="font-size:var(--font-size-sm);font-weight:700">Programmes</span>
-        </div>
-        <p style="font-size:var(--font-size-xs);color:var(--text-muted)">PPL, Full Body, 5×5…</p>
-      </button>
-      <button class="card card-interactive" data-nav="stats" style="text-align:left">
-        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
-          <div class="item-icon" style="width:36px;height:36px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          </div>
-          <span style="font-size:var(--font-size-sm);font-weight:700">Statistiques</span>
-        </div>
-        <p style="font-size:var(--font-size-xs);color:var(--text-muted)">Records, progression…</p>
-      </button>
-      <button class="card card-interactive" data-nav="nutrition" style="text-align:left">
-        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
-          <div class="item-icon accent" style="width:36px;height:36px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-          </div>
-          <span style="font-size:var(--font-size-sm);font-weight:700">Nutrition</span>
-        </div>
-        <p style="font-size:var(--font-size-xs);color:var(--text-muted)">Calories, macros…</p>
-      </button>
-      <button class="card card-interactive" data-nav="exercices" style="text-align:left">
-        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2)">
-          <div class="item-icon success" style="width:36px;height:36px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
-          </div>
-          <span style="font-size:var(--font-size-sm);font-weight:700">Exercices</span>
-        </div>
-        <p style="font-size:var(--font-size-xs);color:var(--text-muted)">Bibliothèque complète</p>
-      </button>
-    </div>`;
-}
-
 function _renderLastSeancesWidget(ctx) {
   return `
     <div class="page-section" data-widget="last-seances">
@@ -333,33 +327,6 @@ function _renderLastSeancesWidget(ctx) {
         ${renderLastSeances(ctx.dash.lastSeances)}
       </div>
     </div>`;
-}
-
-function renderWeekDots(seancesWeek) {
-  const days = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-  const today = new Date();
-  const dayOfWeek = (today.getDay() + 6) % 7; // 0=lundi
-
-  const done = new Set(
-    seancesWeek.map((s) => {
-      const d = new Date(s.date);
-      return (d.getDay() + 6) % 7;
-    })
-  );
-
-  return days.map((label, i) => {
-    const isDone = done.has(i);
-    const isToday = i === dayOfWeek;
-    return `
-      <div class="week-dot">
-        <span class="week-dot-label" style="${isToday ? 'color:var(--color-primary)' : ''}">${label}</span>
-        <div class="week-dot-circle ${isDone ? 'done' : ''}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-        </div>
-      </div>`;
-  }).join('');
 }
 
 function renderLastSeances(seances) {

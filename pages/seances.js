@@ -1,6 +1,6 @@
 import { currentUser }       from '../js/auth.js';
 import { supabase }           from '../js/supabase.js';
-import { showToast, formatDate, formatDuration, openModal, closeModal, emptyState, showLoading, hideLoading, confirmDialog, escapeHtml } from '../js/utils.js';
+import { showToast, formatDate, formatDuration, openModal, closeModal, emptyState, showLoading, hideLoading, confirmDialog, escapeHtml, localDateStr } from '../js/utils.js';
 import { hasActiveSeance, startSeance, resumeActiveView, tryRestoreSeance, MAX_OVERHEAD_MIN } from './seance-active.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 import { SET_TYPES, setTypeOf, isWorkingRow, setTypeClass, setTypeLabel } from '../js/set-types.js';
@@ -18,13 +18,21 @@ export async function loadSeances(section) {
   if (corrigees > 0) showToast(`${corrigees} durée${corrigees > 1 ? 's' : ''} corrigée${corrigees > 1 ? 's' : ''} ✓`, 'success', 4000);
 
   section.innerHTML = `
-    <div class="page-section">
-      <button class="btn btn-primary btn-full btn-lg" id="btn-new-seance">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="width:20px;height:20px">
-          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-        Nouvelle séance
+    <div class="page-section seances-actions">
+      <button class="btn btn-primary btn-full btn-lg" id="btn-from-prog">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px"><polygon points="7 4 20 12 7 20 7 4"/></svg>
+        Lancer une séance
       </button>
+      <div class="seances-actions-row">
+        <button class="btn btn-secondary" id="btn-new-seance">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="width:16px;height:16px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Séance libre
+        </button>
+        <button class="btn btn-secondary" id="btn-new-prog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:16px;height:16px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Programmes
+        </button>
+      </div>
     </div>
 
     <div class="tabs" id="seances-tabs">
@@ -35,6 +43,16 @@ export async function loadSeances(section) {
     <div id="seances-list-content">${_skeleton()}</div>`;
 
   section.querySelector('#btn-new-seance')?.addEventListener('click', () => _openNewSeanceModal(section));
+  // Lancer depuis un programme, ou aller créer / gérer ses programmes —
+  // jusque-là l'onglet Séances ne proposait que la séance libre.
+  section.querySelector('#btn-from-prog')?.addEventListener('click', async () => {
+    const { openQuickLaunchModal } = await import('../js/quick-launch.js');
+    openQuickLaunchModal();
+  });
+  section.querySelector('#btn-new-prog')?.addEventListener('click', async () => {
+    const { navigate } = await import('../js/router.js');
+    navigate('programmes');
+  });
 
   section.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -216,7 +234,7 @@ async function _loadList(section, filter) {
     if (filter === 'recentes') query = query.limit(20);
     else if (filter === 'mois') {
       const d = new Date(); d.setDate(1);
-      query = query.gte('date', d.toISOString().split('T')[0]);
+      query = query.gte('date', localDateStr(d));
     }
 
     const { data, error } = await query;
@@ -340,7 +358,7 @@ async function _renderCalendrier(section) {
 function _calendarHTML(viewDate, seances) {
   const year  = viewDate.getFullYear();
   const month = viewDate.getMonth();
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateStr();
 
   const monthName = new Date(year, month, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   const firstDay  = new Date(year, month, 1).getDay();
@@ -447,7 +465,7 @@ async function _renderVolume(section) {
 
   try {
     // Récupère les séries des 8 dernières semaines
-    const since = new Date(Date.now() - 8 * 7 * 86400000).toISOString().split('T')[0];
+    const since = localDateStr(new Date(Date.now() - 8 * 7 * 86400000));
     const { data: series } = await supabase
       .from('series')
       .select('seance_id, poids_kg, repetitions, created_at')
@@ -469,8 +487,8 @@ async function _renderVolume(section) {
     for (let w = 7; w >= 0; w--) {
       const end   = new Date(Date.now() - w * 7 * 86400000);
       const start = new Date(end - 6 * 86400000);
-      const startStr = start.toISOString().split('T')[0];
-      const endStr   = end.toISOString().split('T')[0];
+      const startStr = localDateStr(start);
+      const endStr   = localDateStr(end);
       const weekSeries = (series ?? []).filter(s => {
         const date = seanceDateMap[s.seance_id];
         return date && date >= startStr && date <= endStr;
@@ -541,7 +559,7 @@ function _openNewSeanceModal(section) {
         <div class="form-group">
           <label class="form-label">Date</label>
           <input class="form-input" id="new-seance-date" type="date"
-            value="${today.toISOString().split('T')[0]}">
+            value="${localDateStr(today)}">
         </div>
       </div>`,
     footer: `

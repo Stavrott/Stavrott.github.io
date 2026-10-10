@@ -41,7 +41,37 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true }), { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
     }
 
-    const { duration_seconds, title, body } = await req.json();
+    const payload = await req.json();
+
+    // Rappels des jours de séance prévus : le client renvoie la liste
+    // complète des 7 prochains jours ; on remplace les rappels encore en
+    // attente par cette liste (changement de jours, d'heure, désactivation).
+    if (payload?.kind === 'rappels') {
+      const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+      await admin.from('push_pending').update({ sent: true })
+        .eq('user_id', user.id).eq('sent', false).like('title', 'Forme — Séance prévue%');
+      const now = Date.now();
+      const max = now + 8 * 24 * 3600 * 1000;
+      const rows = (Array.isArray(payload.items) ? payload.items : [])
+        .map((it: { deliver_at?: string; body?: string }) => ({ at: Date.parse(String(it?.deliver_at ?? '')), body: String(it?.body ?? '').slice(0, 200) }))
+        .filter((it: { at: number }) => Number.isFinite(it.at) && it.at > now && it.at <= max)
+        .slice(0, 8)
+        .map((it: { at: number; body: string }) => ({
+          user_id: user.id,
+          deliver_at: new Date(it.at).toISOString(),
+          title: 'Forme — Séance prévue aujourd’hui',
+          body: it.body || 'C’est un de tes jours d’entraînement.',
+        }));
+      if (rows.length) {
+        const { error } = await admin.from('push_pending').insert(rows);
+        if (error) throw error;
+      }
+      return new Response(JSON.stringify({ ok: true, count: rows.length }), {
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { duration_seconds, title, body } = payload;
     const duration = Number(duration_seconds);
     if (!duration || duration <= 0 || duration > 1800) {
       return new Response(JSON.stringify({ error: 'Durée invalide' }), { status: 400, headers: CORS_HEADERS });

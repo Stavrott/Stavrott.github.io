@@ -315,8 +315,16 @@ function _bindNotificationActions() {
 
 // ── API publique ───────────────────────────────────────────────────────
 
-export function startRestTimer(seconds = APP_CONFIG.defaultRestTime) {
+export function startRestTimer(seconds = APP_CONFIG.defaultRestTime, next = '') {
   runToken++;
+  // Ce qui vient après le repos (exercice, série, charge) : on prépare la
+  // machine ou les disques pendant qu'on souffle.
+  const nextEl = document.getElementById('timer-next');
+  if (nextEl) {
+    nextEl.hidden = !next;
+    const txt = nextEl.querySelector('.timer-next-text');
+    if (txt) txt.textContent = next || '';
+  }
   totalTime = seconds;
   remaining = seconds;
   minimized = false;
@@ -337,7 +345,7 @@ export function startRestTimer(seconds = APP_CONFIG.defaultRestTime) {
   // totalement fermée / l'écran éteint, contrairement à la notif locale
   // ci-dessus qui dépend du JS de la page (suspendu en arrière-plan).
   pendingPushId = null;
-  scheduleRestPush(seconds, 'Forme — Repos terminé !', 'C\'est l\'heure de votre prochaine série')
+  scheduleRestPush(seconds, 'Forme — Repos terminé !', next ? `À suivre : ${next}` : 'C\'est l\'heure de votre prochaine série')
     .then(id => { pendingPushId = id; });
 }
 

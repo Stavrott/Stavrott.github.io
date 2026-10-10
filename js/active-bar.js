@@ -48,6 +48,8 @@ function _tick() {
   const show           = showRest || showSeance;
 
   bar.classList.toggle('hidden', !show);
+  // La vue focus remonte ses boutons au-dessus de la barre flottante.
+  document.body.classList.toggle('has-floating-bar', show);
   if (!show) return;
 
   if (showRest) {

@@ -1,6 +1,7 @@
 import { currentUser }               from '../js/auth.js';
 import { supabase }                   from '../js/supabase.js';
-import { showToast, formatTime, openModal, closeModal, confirmDialog } from '../js/utils.js';
+import { showToast, formatTime, openModal, closeModal, confirmDialog, localDateStr, calc1RM } from '../js/utils.js';
+import { enqueueInsert, enqueueUpdate, enqueueDelete, cancelQueued, patchQueuedInsert, pendingCount } from '../js/sync-queue.js';
 import { startRestTimer, hideTimer }  from '../components/timer.js';
 import { APP_CONFIG }                 from '../js/config.js';
 import { metricFields, parseFieldValue, fieldByKey, FIELD_DB_COLUMN, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
@@ -49,6 +50,8 @@ function _persistState() {
       seanceDate:          _state.seance.date,
       startTime:           _startTime,
       routineId:           _state.routineId ?? null,
+      programmeRef:        _state.programmeRef ?? null,
+      chrono:              _state.chrono ?? null,
       routineExerciceNoms: _state.routineExerciceNoms ?? [],
       exercices:           _state.exercices,
     }));
@@ -76,6 +79,8 @@ export async function tryRestoreSeance() {
     _state = {
       seance:              { id: data.id, nom: data.nom, date: data.date },
       routineId:           saved.routineId ?? null,
+      programmeRef:        saved.programmeRef ?? null,
+      chrono:              saved.chrono ?? null,
       routineExerciceNoms: saved.routineExerciceNoms ?? [],
       exercices:           saved.exercices ?? [],
     };
@@ -111,6 +116,38 @@ const _uid = () => Math.random().toString(36).slice(2, 10);
 const _esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
 export function hasActiveSeance()   { return _state !== null; }
+
+// Séance lancée depuis un programme : en fin de séance, les charges
+// réellement faites mettent à jour la séance du programme.
+export function setProgrammeRef(ref) {
+  if (!_state) return;
+  _state.programmeRef = ref ?? null;
+  _persistState();
+}
+
+// Une série mise en file d'attente hors-ligne vient d'être enregistrée :
+// elle récupère son identifiant en base (pour les corrections ultérieures).
+window.addEventListener('forme-sync-inserted', (e) => {
+  if (!_state || e.detail?.table !== 'series') return;
+  for (const ex of _state.exercices) {
+    for (const set of ex.sets) {
+      if (set.syncId === e.detail.localId) { set.syncId = null; set.dbId = e.detail.id; }
+    }
+  }
+  _persistState();
+});
+window.addEventListener('forme-sync-change', (e) => {
+  const el = document.getElementById('sync-pill');
+  if (!el) return;
+  const n = e.detail?.pending ?? 0;
+  el.hidden = n === 0;
+  el.textContent = n ? `${n} en attente de synchro` : '';
+});
+
+function _syncPillHTML() {
+  const n = pendingCount();
+  return `<span class="sync-pill" id="sync-pill" role="status" ${n ? '' : 'hidden'}>${n ? `${n} en attente de synchro` : ''}</span>`;
+}
 export function getActiveSeance()  { return _state?.seance ?? null; }
 export function getElapsedSeconds() { return _startTime ? Math.floor((Date.now() - _startTime) / 1000) : 0; }
 
@@ -196,7 +233,7 @@ export function requestFinishSeance() {
 export async function startSeance(nom, section, onFinish) {
   const { data, error } = await supabase
     .from('seances')
-    .insert({ user_id: currentUser.id, nom, date: new Date().toISOString().split('T')[0] })
+    .insert({ user_id: currentUser.id, nom, date: localDateStr() })
     .select().single();
 
   if (error) throw error;
@@ -372,6 +409,9 @@ function _statsLabel(exoCount, setsDone) {
 
 const _SVG_LIST  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1" fill="currentColor"/><circle cx="3.5" cy="12" r="1" fill="currentColor"/><circle cx="3.5" cy="18" r="1" fill="currentColor"/></svg>`;
 const _SVG_CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
+const _SVG_PAUSE = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>`;
+const _SVG_PLAY  = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="7 4 20 12 7 20"/></svg>`;
+const _SVG_CHRONO = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2"/><path d="M9 2h6"/></svg>`;
 const _SVG_PREV  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>`;
 const _SVG_NEXT  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>`;
 
@@ -421,18 +461,43 @@ function _renderFocus() {
   const progress = allSets ? Math.round((doneSets * 100) / allSets) : 0;
   const allDone  = blocks.every(b => _blockPendingRound(b) === -1);
   const superset = indices.length > 1;
-  const first    = _state.exercices[indices[0]];
+  const ei0      = indices[0];
+  const first    = _state.exercices[ei0];
+  const curSet   = first.sets[r];
   const prevBlock = bi > 0 ? blocks[bi - 1] : null;
   const nextBlock = bi < blocks.length - 1 ? blocks[bi + 1] : null;
+  const isKg     = (first.type_metrique || DEFAULT_METRIC_TYPE) === 'kg_reps';
+  const warmup   = !superset && curSet && !isWorkingSet(curSet.type);
 
   const dots = Array.from({ length: total }, (_, k) => {
     const cls = _blockRoundDone(block, k) ? 'is-done' : k === pending ? 'is-current' : '';
-    return `<span class="focus-dot ${cls}"></span>`;
+    const ech = !superset && first.sets[k] && !isWorkingSet(first.sets[k].type) ? ' is-warmup' : '';
+    return `<span class="focus-dot ${cls}${ech}"></span>`;
   }).join('');
 
   const validateAttrs = superset
     ? `data-action="toggle-round" data-indices="${indices.join(',')}" data-round="${r}"`
-    : `data-action="toggle-done" data-exo="${indices[0]}" data-set="${r}"`;
+    : `data-action="toggle-done" data-exo="${ei0}" data-set="${r}"`;
+
+  // Numéro de série : les échauffements portent « É » et ne consomment pas
+  // de rang, comme dans la vue liste.
+  const workTotal = superset ? total : first.sets.filter(x => isWorkingSet(x.type)).length;
+  const setNum = warmup
+    ? `<div class="focus-setnum is-warmup" aria-label="Série d’échauffement"><span class="focus-setnum-big">É</span></div>`
+    : `<div class="focus-setnum" aria-label="Série ${superset ? r + 1 : _workingNumber(first, r)} sur ${workTotal}">
+         <span class="focus-setnum-big">${superset ? r + 1 : _workingNumber(first, r)}</span><span class="focus-setnum-total">/${workTotal}</span>
+       </div>`;
+
+  // Aides sous le titre (exercice seul) : record, suggestion, disques.
+  const sg   = !superset && pending !== -1 && !first.suggestionAppliquee ? _suggestion(first) : null;
+  const rec  = !superset && isKg && first.record && !first.record.vide ? first.record : null;
+  const prOk = !superset && first.sets.some(x => x.done && x.pr);
+  const disques = !superset && isKg && pending !== -1 && _isBarre(first) ? _disquesLabel(curSet?.poids) : '';
+  const canWarmup = !superset && isKg && pending !== -1
+    && !first.sets.some(x => x.done) && !first.sets.some(x => !isWorkingSet(x.type))
+    && Number(first.sets.find(x => isWorkingSet(x.type))?.poids) >= 10;
+  const hasChrono = !superset && pending !== -1 && metricFields(first.type_metrique).some(f => f.key === 'duree');
+  const chronoOn  = hasChrono && _state.chrono?.ei === ei0 && _state.chrono?.si === r;
 
   _section.innerHTML = `
     <div class="focus-view" id="focus-root">
@@ -448,46 +513,63 @@ function _renderFocus() {
         <span class="focus-elapsed" id="session-elapsed">${formatTime(getElapsedSeconds())}</span>
         <button class="btn btn-secondary btn-sm" id="btn-finish-seance">Terminer</button>
       </div>
+      ${_syncPillHTML()}
 
       <div class="focus-main">
         ${superset ? `<p class="focus-eyebrow">Superset · ${indices.length} exercices</p>` : ''}
-        <h2 class="focus-title" data-action="show-exo-detail" data-exo="${indices[0]}">
+        <h2 class="focus-title" data-action="show-exo-detail" data-exo="${ei0}">
           ${superset ? indices.map(i => _esc(_state.exercices[i].nom)).join(' + ') : _esc(first.nom)}
         </h2>
         ${!superset && first.lastPerf ? `<p class="focus-hint">Dernière fois : ${_esc(first.lastPerf)}</p>` : ''}
+        ${prOk ? `<p class="focus-record is-new">Nouveau record aujourd’hui</p>`
+          : rec ? `<p class="focus-record">Record : ${String(rec.poids).replace('.', ',')} kg · 1RM estimé ${rec.e1rm} kg</p>` : ''}
+
+        ${sg ? `
+          <div class="focus-suggest" role="note">
+            <p><strong>Tu peux monter à ${String(sg.poids).replace('.', ',')} kg</strong><br>
+            <span>La dernière fois, toutes tes séries à ${String(sg.depuis).replace('.', ',')} kg ont atteint ${sg.reps} répétitions.</span></p>
+            <button class="btn btn-sm btn-primary" data-action="apply-suggest" data-exo="${ei0}">Appliquer</button>
+          </div>` : ''}
 
         ${pending === -1 ? `
           <div class="focus-done">
             <span class="focus-done-badge">${_SVG_CHECK}</span>
             <p class="focus-done-text">${allDone ? 'Toutes les séries sont faites' : 'Exercice terminé'}</p>
           </div>
-          ${allDone
-            ? `<button class="btn btn-primary focus-cta" data-action="focus-finish">Terminer la séance</button>`
-            : nextBlock ? `<button class="btn btn-primary focus-cta" data-action="focus-go" data-block="${bi + 1}">Exercice suivant</button>` : ''}
         ` : `
-          <div class="focus-setnum" aria-label="Série ${r + 1} sur ${total}">
-            <span class="focus-setnum-big">${r + 1}</span><span class="focus-setnum-total">/${total}</span>
-          </div>
-          <p class="focus-eyebrow">${superset ? 'Tour en cours' : 'Série en cours'}</p>
+          ${chronoOn ? '' : setNum}
+          <p class="focus-eyebrow">${chronoOn ? `Série ${_workingNumber(first, r) || 'É'} / ${workTotal}` : superset ? 'Tour en cours' : warmup ? 'Échauffement' : 'Série en cours'}</p>
 
-          ${indices.map(ei => `
+          ${chronoOn ? _chronoHTML(ei0, r) : indices.map(ei => `
             ${superset ? `<p class="focus-sub">${_esc(_state.exercices[ei].nom)}</p>` : ''}
             ${_focusStepperHTML(_state.exercices[ei], ei, r, superset)}`).join('')}
-
-          <button class="focus-validate" ${validateAttrs} aria-label="${superset ? 'Valider le tour' : 'Valider la série'}">${_SVG_CHECK}</button>
-          <p class="focus-validate-label">${superset ? 'Valider le tour' : 'Valider la série'}</p>
+          ${disques ? `<p class="focus-plates">${_esc(disques)}</p>` : ''}
+          ${canWarmup ? `<button class="focus-link" data-action="add-warmup" data-exo="${ei0}">Ajouter un échauffement (3 séries)</button>` : ''}
         `}
 
         <div class="focus-dots" aria-hidden="true">${dots}</div>
       </div>
 
-      <div class="focus-nav">
-        ${prevBlock
-          ? `<button class="focus-nav-btn" data-action="focus-go" data-block="${bi - 1}">${_SVG_PREV}<span>${_esc(_blockLabel(prevBlock))}</span></button>`
-          : '<span></span>'}
-        ${nextBlock
-          ? `<button class="focus-nav-btn is-next" data-action="focus-go" data-block="${bi + 1}"><span>Suivant : ${_esc(_blockLabel(nextBlock))}</span>${_SVG_NEXT}</button>`
-          : '<span></span>'}
+      <div class="focus-dock">
+        ${pending === -1
+          ? (allDone
+              ? `<button class="btn btn-primary focus-dock-main" data-action="focus-finish">Terminer la séance</button>`
+              : nextBlock ? `<button class="btn btn-primary focus-dock-main" data-action="focus-go" data-block="${bi + 1}">Exercice suivant</button>` : '')
+          : `<div class="focus-dock-row">
+              ${hasChrono && !chronoOn ? `<button class="btn btn-secondary focus-dock-chrono" data-action="chrono-start">${_SVG_CHRONO}<span>Chrono</span></button>` : ''}
+              ${chronoOn ? (_state.chrono.startedAt || _state.chrono.countdownUntil
+                ? `<button class="btn btn-secondary focus-dock-chrono" data-action="chrono-pause">${_SVG_PAUSE}<span>Pause</span></button>`
+                : `<button class="btn btn-secondary focus-dock-chrono" data-action="chrono-start">${_SVG_PLAY}<span>Reprendre</span></button>`) : ''}
+              <button class="btn btn-primary focus-dock-main" ${validateAttrs}>${_SVG_CHECK}<span>${superset ? 'Valider le tour' : warmup ? 'Valider l’échauffement' : 'Valider la série'}</span></button>
+            </div>`}
+        <div class="focus-nav">
+          ${prevBlock
+            ? `<button class="focus-nav-btn" data-action="focus-go" data-block="${bi - 1}">${_SVG_PREV}<span>${_esc(_blockLabel(prevBlock))}</span></button>`
+            : '<span></span>'}
+          ${nextBlock
+            ? `<button class="focus-nav-btn is-next" data-action="focus-go" data-block="${bi + 1}"><span>Suivant : ${_esc(_blockLabel(nextBlock))}</span>${_SVG_NEXT}</button>`
+            : '<span></span>'}
+        </div>
       </div>
     </div>`;
 
@@ -496,6 +578,154 @@ function _renderFocus() {
   root?.addEventListener('click',    _onCardClick);
   root?.addEventListener('input',    _onInputChange);
   root?.addEventListener('focusout', _onInputBlur);
+  _chronoPaint();
+}
+
+// ── Chrono des exercices en durée (planche, tapis, vélo…) ─────────────
+// Avec une durée cible : compte à rebours, puis dépassement affiché en
+// « +0:05 ». Sans cible : chronomètre simple. « Arrêter » écrit le temps
+// réellement tenu dans la série ; il reste à la valider.
+// L'état vit dans _state.chrono pour survivre à un rechargement de l'appli.
+
+let _chronoTick = null;
+let _wakeLock   = null;
+
+function _fmtChrono(sec) {
+  const s = Math.max(0, Math.round(sec));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function _chronoElapsed(c) {
+  if (!c) return 0;
+  const run = c.startedAt ? (Date.now() - c.startedAt) / 1000 : 0;
+  return Math.max(0, (c.acc || 0) + run);
+}
+
+function _chronoHTML(ei, si) {
+  const set = _state.exercices[ei]?.sets[si];
+  const c   = _state.chrono && _state.chrono.ei === ei && _state.chrono.si === si ? _state.chrono : null;
+  const target = c?.target ?? (Number(set?.duree) || 0);
+  const running = !!c?.startedAt || !!c?.countdownUntil;
+  const R = 52, C = Math.round(2 * Math.PI * R);
+  return `
+    <div class="focus-chrono ${running ? 'is-running' : ''}" id="focus-chrono" data-exo="${ei}" data-set="${si}">
+      <div class="focus-chrono-ring">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="fc-track" cx="60" cy="60" r="${R}"/>
+          <circle class="fc-fill" id="fc-fill" cx="60" cy="60" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${C}"/>
+        </svg>
+        <div class="focus-chrono-center">
+          <span class="focus-chrono-time" id="fc-time" role="timer">${_fmtChrono(target || 0)}</span>
+          <span class="focus-chrono-sub" id="fc-sub">${target ? `objectif ${_fmtChrono(target)}` : 'chrono'}</span>
+        </div>
+      </div>
+      <button class="focus-link" data-action="chrono-reset">Annuler le chrono</button>
+    </div>`;
+}
+
+function _chronoPaint() {
+  clearInterval(_chronoTick); _chronoTick = null;
+  const el = _section?.querySelector('#focus-chrono');
+  if (!el) return;
+  const c = _state?.chrono;
+  const ei = +el.dataset.exo, si = +el.dataset.set;
+  const mine = c && c.ei === ei && c.si === si;
+  const draw = () => {
+    const timeEl = document.getElementById('fc-time');
+    const subEl  = document.getElementById('fc-sub');
+    const fill   = document.getElementById('fc-fill');
+    if (!timeEl || !_state) { clearInterval(_chronoTick); _chronoTick = null; return; }
+    const cc = _state.chrono;
+    if (!cc || cc.ei !== ei || cc.si !== si) return;
+    // Décompte de départ (3, 2, 1) pour se mettre en position.
+    if (cc.countdownUntil) {
+      const left = Math.ceil((cc.countdownUntil - Date.now()) / 1000);
+      if (left > 0) { timeEl.textContent = String(left); subEl.textContent = 'en position'; return; }
+      cc.countdownUntil = null; cc.startedAt = Date.now(); _beep(880, 0.12); _persistState();
+    }
+    const el2 = _chronoElapsed(cc);
+    const t = cc.target || 0;
+    const C = +fill.getAttribute('stroke-dasharray');
+    if (t > 0) {
+      const over = el2 - t;
+      timeEl.textContent = over >= 0 ? `+${_fmtChrono(over)}` : _fmtChrono(t - el2);
+      subEl.textContent  = over >= 0 ? 'objectif atteint' : `objectif ${_fmtChrono(t)}`;
+      el.classList.toggle('is-over', over >= 0);
+      fill.setAttribute('stroke-dashoffset', String(C * (1 - Math.min(1, el2 / t))));
+      if (over >= 0 && !cc.alerted) { cc.alerted = true; navigator.vibrate?.([200, 100, 200]); _beep(1046, 0.25); _persistState(); }
+    } else {
+      timeEl.textContent = _fmtChrono(el2);
+      subEl.textContent  = 'chrono';
+      fill.setAttribute('stroke-dashoffset', String(C * (1 - ((el2 % 60) / 60))));
+    }
+  };
+  if (mine) {
+    draw();
+    if (c.startedAt || c.countdownUntil) _chronoTick = setInterval(draw, 250);
+  }
+}
+
+let _audioCtx = null;
+function _beep(freq = 880, dur = 0.15) {
+  try {
+    _audioCtx ??= new (window.AudioContext || window.webkitAudioContext)();
+    const o = _audioCtx.createOscillator(), g = _audioCtx.createGain();
+    o.frequency.value = freq; g.gain.value = 0.15;
+    o.connect(g); g.connect(_audioCtx.destination);
+    o.start(); o.stop(_audioCtx.currentTime + dur);
+  } catch {}
+}
+
+async function _keepAwake(on) {
+  try {
+    if (on && !_wakeLock && 'wakeLock' in navigator) _wakeLock = await navigator.wakeLock.request('screen');
+    if (!on && _wakeLock) { await _wakeLock.release(); _wakeLock = null; }
+  } catch {}
+}
+
+function _chronoAction(action) {
+  if (!_state) return;
+  const el = _section?.querySelector('#focus-chrono');
+  let ei, si;
+  if (el) { ei = +el.dataset.exo; si = +el.dataset.set; }
+  else {
+    // Lancement depuis le bas d'écran : série en cours du bloc affiché.
+    const v = _section?.querySelector('.focus-dock-main[data-action="toggle-done"]');
+    if (!v) return;
+    ei = +v.dataset.exo; si = +v.dataset.set;
+  }
+  const exo = _state.exercices[ei], set = exo?.sets[si];
+  if (!set) return;
+  let c = _state.chrono && _state.chrono.ei === ei && _state.chrono.si === si ? _state.chrono : null;
+
+  if (action === 'chrono-start') {
+    if (!c) {
+      const input = _section.querySelector(`.focus-step-input[data-field="duree"][data-exo="${ei}"][data-set="${si}"]`);
+      const target = input ? (parseInt(input.value) || 0) : (Number(set.duree) || 0);
+      const iso = exo.type_metrique === 'isometrique';
+      c = _state.chrono = { ei, si, target, acc: 0, startedAt: iso ? null : Date.now(), countdownUntil: iso ? Date.now() + 3000 : null, alerted: false };
+      _audioCtx ??= (() => { try { return new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } })();
+    } else {
+      c.startedAt = Date.now();
+    }
+    _keepAwake(true);
+  }
+  if (action === 'chrono-pause' && c) {
+    if (c.countdownUntil) { c.countdownUntil = null; }
+    else { c.acc = _chronoElapsed(c); c.startedAt = null; }
+  }
+  if (action === 'chrono-reset') { _state.chrono = null; _keepAwake(false); }
+  if (action === 'chrono-stop' && c) {
+    const secs = Math.round(_chronoElapsed(c));
+    _state.chrono = null;
+    _keepAwake(false);
+    if (secs > 0) {
+      set.duree = secs;
+      showToast(`${_fmtChrono(secs)} enregistré pour cette série`, 'success');
+    }
+  }
+  _persistState();
+  render();
 }
 
 function _focusStep(ei, si, key, dir) {
@@ -508,6 +738,186 @@ function _focusStep(ei, si, key, dir) {
   set[key] = next;
   if (input) input.value = next;
   _persistState();
+}
+
+
+// ── Enregistrement des séries (avec file hors-ligne) ─────────────────
+
+async function _saveSerie(set, row) {
+  let data = null;
+  try { ({ data } = await supabase.from('series').insert(row).select().single()); } catch {}
+  if (data?.id) { set.dbId = data.id; set.syncId = null; return; }
+  // Réseau indisponible : la série reste validée et partira dès que
+  // possible (js/sync-queue.js). Rien n'est perdu.
+  set.dbId = null;
+  set.syncId = enqueueInsert('series', row);
+}
+
+async function _deleteSerie(set) {
+  if (set.syncId) { cancelQueued(set.syncId); set.syncId = null; return; }
+  if (!set.dbId) return;
+  let error = null;
+  try { ({ error } = await supabase.from('series').delete().eq('id', set.dbId)); } catch (e) { error = e; }
+  if (error) enqueueDelete('series', set.dbId);
+  set.dbId = null;
+}
+
+// ── Records ───────────────────────────────────────────────────────────
+// Record de charge (poids max) et de 1RM estimé, sur les séries de
+// travail (hors échauffement). Un exercice jamais fait n'a pas de record
+// à battre : sa première série n'est pas annoncée comme un record.
+
+async function _loadRecord(exo) {
+  if (!exo || (exo.type_metrique || DEFAULT_METRIC_TYPE) !== 'kg_reps') return;
+  try {
+    const { data } = await supabase.from('series')
+      .select('poids_kg, repetitions')
+      .eq('user_id', currentUser.id)
+      .eq('exercice_nom', exo.nom)
+      .neq('type_serie', 'echauffement')
+      .order('poids_kg', { ascending: false })
+      .limit(30);
+    const rows = (data ?? []).filter(r => Number(r.poids_kg) > 0 && Number(r.repetitions) > 0);
+    exo.record = rows.length
+      ? { poids: Math.max(...rows.map(r => Number(r.poids_kg))), e1rm: Math.max(...rows.map(r => calc1RM(Number(r.poids_kg), Number(r.repetitions)))) }
+      : { poids: 0, e1rm: 0, vide: true };
+    _persistState();
+  } catch {}
+}
+
+function _checkRecord(exo, set) {
+  const rec = exo?.record;
+  if (!rec || rec.vide || !isWorkingSet(set.type)) return;
+  const poids = Number(set.poids), reps = Number(set.reps);
+  if (!(poids > 0 && reps > 0)) return;
+  const e1rm = calc1RM(poids, reps);
+  const charge = poids > rec.poids;
+  const rm     = e1rm > rec.e1rm;
+  if (!charge && !rm) return;
+  set.pr = charge ? 'charge' : '1rm';
+  exo.record = { poids: Math.max(rec.poids, poids), e1rm: Math.max(rec.e1rm, e1rm) };
+  const fmt = String(poids).replace('.', ',');
+  showToast(charge ? `Nouveau record : ${exo.nom} à ${fmt} kg` : `Nouveau record : ${exo.nom}, ${fmt} kg × ${reps} (1RM estimé ${e1rm} kg)`, 'success', 4000);
+}
+
+function _recordsDuJour() {
+  const out = [];
+  for (const ex of _state?.exercices ?? []) {
+    const best = ex.sets.filter(x => x.done && x.pr).sort((a, b) => calc1RM(b.poids, b.reps) - calc1RM(a.poids, a.reps))[0];
+    if (best) out.push({ exercice: ex.nom, poids: best.poids, reps: best.reps, type: best.pr });
+  }
+  return out;
+}
+
+// ── Pendant le repos : ce qui vient ensuite ───────────────────────────
+
+function _nextLabel(ei, si) {
+  const blocks = _buildBlocks(_state.exercices);
+  const fmtSet = (exo, k) => {
+    const x = exo.sets[k];
+    if (!x) return '';
+    const fields = metricFields(exo.type_metrique);
+    if (fields[0]?.key === 'poids') return `${String(x.poids ?? '?').replace('.', ',')} kg × ${x.reps ?? '?'}`;
+    return fields.map(f => `${x[f.key] ?? '?'} ${f.short}`).join(' · ');
+  };
+  let bi = _findBlockContaining(blocks, ei);
+  for (let i = Math.max(0, bi); i < blocks.length; i++) {
+    const r = _blockPendingRound(blocks[i]);
+    if (r === -1) continue;
+    const idxs = blocks[i].type === 'single' ? [blocks[i].index] : blocks[i].indices;
+    const exo = _state.exercices[idxs[0]];
+    const nom = idxs.map(k => _state.exercices[k].nom).join(' + ');
+    if (idxs.length > 1) return `${nom} · tour ${r + 1}/${_blockRoundsTotal(blocks[i])} · ${fmtSet(exo, r)}`;
+    const quoi = isWorkingSet(exo.sets[r]?.type)
+      ? `série ${_workingNumber(exo, r)}/${exo.sets.filter(x => isWorkingSet(x.type)).length}`
+      : 'échauffement';
+    return `${nom} · ${quoi} · ${fmtSet(exo, r)}`;
+  }
+  return 'Dernière série faite : tu peux terminer la séance';
+}
+
+// ── Suggestion de progression ─────────────────────────────────────────
+// Si, la dernière fois, toutes les séries à la charge la plus haute ont
+// atteint les répétitions prévues aujourd'hui, on propose d'augmenter.
+
+function _increment(exo, poids) {
+  const nom = (exo.nom || '').toLowerCase();
+  if (nom.includes('haltère') || (exo.materiel || '').toLowerCase().includes('haltère')) return 2;
+  if (poids < 20) return 1;
+  return 2.5;
+}
+
+function _suggestion(exo) {
+  if ((exo.type_metrique || DEFAULT_METRIC_TYPE) !== 'kg_reps') return null;
+  const last = (exo.lastSets ?? []).filter(x => Number(x.poids) > 0 && Number(x.reps) > 0);
+  if (last.length < 2) return null;
+  const max = Math.max(...last.map(x => Number(x.poids)));
+  const top = last.filter(x => Number(x.poids) === max);
+  const pending = exo.sets.filter(x => !x.done && isWorkingSet(x.type));
+  if (!pending.length) return null;
+  const cible = Number(pending[0].reps) || 8;
+  const prevu = Math.max(...pending.map(x => Number(x.poids) || 0));
+  if (top.length < 2 || !top.every(x => Number(x.reps) >= cible) || prevu > max) return null;
+  const sugg = Math.round((max + _increment(exo, max)) * 4) / 4;
+  return { poids: sugg, depuis: max, reps: cible };
+}
+
+function _applySuggestion(ei) {
+  const exo = _state.exercices[ei];
+  const sg = exo && _suggestion(exo);
+  if (!sg) return;
+  exo.sets.forEach(x => { if (!x.done && isWorkingSet(x.type)) x.poids = sg.poids; });
+  exo.suggestionAppliquee = true;
+  render();
+  _persistState();
+}
+
+// ── Disques à charger (barre de 20 kg) ────────────────────────────────
+
+const _DISQUES = [25, 20, 15, 10, 5, 2.5, 1.25];
+
+// Barre olympique de 20 kg uniquement (pas la barre EZ, ni la barre de
+// traction ou les barres parallèles).
+function _isBarre(exo) {
+  const m = (exo.materiel || '').trim().toLowerCase();
+  if (m) return m === 'barre';
+  const n = (exo.nom || '').toLowerCase();
+  return /\bbarre\b/.test(n) && !/(ez|traction|parallèle|fixe)/.test(n);
+}
+
+function _disquesLabel(poids) {
+  const p = Number(poids);
+  if (!(p >= 20)) return '';
+  if (p === 20) return 'Barre seule';
+  let reste = (p - 20) / 2;
+  const out = [];
+  for (const d of _DISQUES) {
+    while (reste >= d - 1e-9) { out.push(d); reste -= d; }
+  }
+  const txt = out.map(d => String(d).replace('.', ',')).join(' + ');
+  return `Par côté : ${txt}${reste > 0.01 ? ' (≈)' : ''}`;
+}
+
+// ── Échauffement automatique ──────────────────────────────────────────
+
+function _arrondi(p, pas = 2.5) { return Math.max(0, Math.round(p / pas) * pas); }
+
+function _addWarmup(ei) {
+  const exo = _state.exercices[ei];
+  if (!exo) return;
+  const travail = exo.sets.find(x => isWorkingSet(x.type));
+  const charge = Number(travail?.poids) || 0;
+  if (charge <= 0) { showToast('Indique d’abord la charge de travail', 'warning'); return; }
+  const base = _isBarre(exo) ? 20 : 0;
+  const etapes = [[0.4, 10], [0.6, 5], [0.8, 3]];
+  const echauf = etapes.map(([pct, reps]) => ({
+    repos: 60, done: false, dbId: null, type: 'echauffement',
+    poids: Math.max(base, _arrondi(charge * pct, charge >= 40 ? 2.5 : 1)), reps,
+  }));
+  exo.sets.unshift(...echauf);
+  render();
+  _persistState();
+  showToast('3 séries d’échauffement ajoutées', 'success');
 }
 
 // ── HTML carte exercice simple ─────────────────────────────────────────
@@ -801,8 +1211,20 @@ async function _onCardClick(e) {
   if (action === 'focus-go')    { _focusBlockIdx = parseInt(btn.dataset.block, 10); render(); return; }
   if (action === 'focus-step')  { _focusStep(parseInt(exo), parseInt(setIdx), btn.dataset.field, parseInt(dir)); return; }
   if (action === 'focus-finish') { _confirmFinish(); return; }
+  if (action?.startsWith('chrono-')) { _chronoAction(action); return; }
+  if (action === 'apply-suggest') { _applySuggestion(parseInt(exo)); return; }
+  if (action === 'add-warmup')    { _addWarmup(parseInt(exo)); return; }
   // Après une validation, le focus suit à nouveau la progression.
-  if (action === 'toggle-done' || action === 'toggle-round') _focusBlockIdx = null;
+  if (action === 'toggle-done' || action === 'toggle-round') {
+    _focusBlockIdx = null;
+    const c = _state?.chrono;
+    if (c && action === 'toggle-done' && c.ei === parseInt(exo) && c.si === parseInt(setIdx)) {
+      const secs = Math.round(_chronoElapsed(c));
+      if (secs > 0) _state.exercices[c.ei].sets[c.si].duree = secs;
+      _state.chrono = null;
+      _keepAwake(false);
+    }
+  }
 
   if (action === 'remove-exo')     await _removeExo(parseInt(exo));
   if (action === 'replace-exo')    await openExercicePicker(parseInt(exo));
@@ -933,14 +1355,14 @@ async function _lookupExerciceMeta(nom) {
     const { getAllExercices } = await import('./exercices.js');
     const EXERCICES = await getAllExercices();
     const exo = EXERCICES.find(e => e.nom === nom);
-    return { type_metrique: exo?.type_metrique || DEFAULT_METRIC_TYPE, muscles: exo?.muscles ?? [] };
+    return { type_metrique: exo?.type_metrique || DEFAULT_METRIC_TYPE, muscles: exo?.muscles ?? [], materiel: exo?.materiel ?? null };
   } catch {
-    return { type_metrique: DEFAULT_METRIC_TYPE, muscles: [] };
+    return { type_metrique: DEFAULT_METRIC_TYPE, muscles: [], materiel: null };
   }
 }
 
 export async function addExercice(nom, { superset = false } = {}) {
-  const { type_metrique, muscles } = await _lookupExerciceMeta(nom);
+  const { type_metrique, muscles, materiel } = await _lookupExerciceMeta(nom);
   const fields = metricFields(type_metrique);
   const perf   = await _fetchLastPerf(nom, type_metrique);
 
@@ -955,10 +1377,11 @@ export async function addExercice(nom, { superset = false } = {}) {
   const nSets = (superset && prev) ? Math.max(prev.sets.length, 1) : 1;
 
   _state.exercices.push({
-    nom, type_metrique, muscles, repos_inter: APP_CONFIG.defaultRestTime,
-    lastPerf: perf?.summary ?? null,
+    nom, type_metrique, muscles, materiel, repos_inter: APP_CONFIG.defaultRestTime,
+    lastPerf: perf?.summary ?? null, lastSets: perf?.sets ?? null,
     sets: Array.from({ length: nSets }, () => _blankSet(fields, perf)),
   });
+  _loadRecord(_state.exercices.at(-1));
 
   render();
   _persistState();
@@ -975,7 +1398,7 @@ async function _replaceExercice(ei, nom) {
   const exo = _state.exercices[ei];
   if (!exo) return;
 
-  const { type_metrique, muscles } = await _lookupExerciceMeta(nom);
+  const { type_metrique, muscles, materiel } = await _lookupExerciceMeta(nom);
   const fields = metricFields(type_metrique);
   const perf   = await _fetchLastPerf(nom, type_metrique);
 
@@ -986,10 +1409,11 @@ async function _replaceExercice(ei, nom) {
   const nSets = Math.max(exo.sets.length, 1);
 
   _state.exercices[ei] = {
-    nom, type_metrique, muscles, repos_inter: exo.repos_inter,
-    lastPerf: perf?.summary ?? null,
+    nom, type_metrique, muscles, materiel, repos_inter: exo.repos_inter,
+    lastPerf: perf?.summary ?? null, lastSets: perf?.sets ?? null,
     sets: Array.from({ length: nSets }, () => _blankSet(fields, perf)),
   };
+  _loadRecord(_state.exercices[ei]);
 
   render();
   _persistState();
@@ -1002,13 +1426,14 @@ export async function addExercices(noms) {
   const perfs = await Promise.all(noms.map((n, i) => _fetchLastPerf(n, metas[i].type_metrique)));
 
   noms.forEach((nom, i) => {
-    const { type_metrique, muscles } = metas[i];
+    const { type_metrique, muscles, materiel } = metas[i];
     const fields = metricFields(type_metrique);
     _state.exercices.push({
-      nom, type_metrique, muscles, repos_inter: APP_CONFIG.defaultRestTime,
-      lastPerf: perfs[i]?.summary ?? null,
+      nom, type_metrique, muscles, materiel, repos_inter: APP_CONFIG.defaultRestTime,
+      lastPerf: perfs[i]?.summary ?? null, lastSets: perfs[i]?.sets ?? null,
       sets: [_blankSet(fields, perfs[i])],
     });
+    _loadRecord(_state.exercices.at(-1));
   });
 
   render();
@@ -1035,19 +1460,23 @@ export async function addExercicesFromRoutine(routine) {
     const fields = metricFields(type_metrique);
     const plannedSeries = ex.series?.length ? ex.series : null;
 
+    // Une série planifiée sans valeur (programme créé à partir de noms
+    // d'exercices) reprend la dernière perf réelle sur cet exercice.
+    const perfSets = perfs[i]?.sets ?? [];
     const sets = plannedSeries
-      ? plannedSeries.map(s => {
+      ? plannedSeries.map((s, k) => {
           const set = { repos: s.repos ?? null, done: false, dbId: null, type: setTypeOf(s.type) };
-          fields.forEach(f => { set[f.key] = s[f.key] ?? null; });
+          fields.forEach(f => { set[f.key] = s[f.key] ?? perfSets[k]?.[f.key] ?? perfSets[0]?.[f.key] ?? null; });
           return set;
         })
       : [_blankSet(fields, perfs[i])];
 
     _state.exercices.push({
-      nom: ex.nom, type_metrique, muscles: metas[i].muscles, repos_inter: ex.repos_inter,
-      lastPerf: perfs[i]?.summary ?? null,
+      nom: ex.nom, type_metrique, muscles: metas[i].muscles, materiel: metas[i].materiel, repos_inter: ex.repos_inter,
+      lastPerf: perfs[i]?.summary ?? null, lastSets: perfs[i]?.sets ?? null,
       sets,
     });
+    _loadRecord(_state.exercices.at(-1));
   });
 
   render();
@@ -1140,7 +1569,7 @@ async function _removeSerie(ei, si) {
   if (!exo) return;
   if (exo.sets.length <= 1) { showToast('Minimum 1 série', 'warning'); return; }
   const set = exo.sets[si];
-  if (set?.dbId) await supabase.from('series').delete().eq('id', set.dbId).catch(() => {});
+  if (set) await _deleteSerie(set);
   exo.sets.splice(si, 1);
   render();
   _persistState();
@@ -1151,7 +1580,7 @@ async function _removeRound(indices, r) {
   if (maxSets <= 1) { showToast('Minimum 1 série', 'warning'); return; }
   for (const idx of indices) {
     const s = _state.exercices[idx].sets[r];
-    if (s?.dbId) await supabase.from('series').delete().eq('id', s.dbId).catch(() => {});
+    if (s) await _deleteSerie(s);
   }
   indices.forEach(idx => _state.exercices[idx].sets.splice(r, 1));
   render();
@@ -1166,10 +1595,16 @@ async function _onInputBlur(e) {
   const { field, exo: exoStr, set: setStr } = input.dataset;
   const set = _state.exercices[parseInt(exoStr)]?.sets[parseInt(setStr)];
   const f   = fieldByKey(field);
-  if (!set || !f || !set.done || !set.dbId) return;
+  if (!set || !f || !set.done) return;
   set[field] = parseFieldValue(f, input.value);
   const col = FIELD_DB_COLUMN[field];
-  if (col) await supabase.from('series').update({ [col]: set[field] }).eq('id', set.dbId).catch(() => {});
+  if (!col) return;
+  if (set.syncId) { patchQueuedInsert(set.syncId, { [col]: set[field] }); _persistState(); return; }
+  if (!set.dbId) return;
+  let error = null;
+  try { ({ error } = await supabase.from('series').update({ [col]: set[field] }).eq('id', set.dbId)); } catch (e) { error = e; }
+  if (error) enqueueUpdate('series', set.dbId, { [col]: set[field] });
+  _persistState();
 }
 
 // ── Chrono séries avec durée cible ────────────────────────────────────
@@ -1314,22 +1749,14 @@ async function _toggleDone(ei, si) {
     };
     fields.forEach(f => { row[FIELD_DB_COLUMN[f.key]] = set[f.key] ?? null; });
 
-    try {
-      const { data } = await supabase.from('series').insert(row).select().single();
-      if (data) set.dbId = data.id;
-    } catch {
-      set.done = false;
-      showToast('Erreur de sauvegarde', 'error');
-      return;
-    }
+    await _saveSerie(set, row);
+    _checkRecord(exo, set);
 
-    startRestTimer(set.repos);
+    startRestTimer(set.repos, _nextLabel(ei, si));
   } else {
     set.done = false;
-    if (set.dbId) {
-      await supabase.from('series').delete().eq('id', set.dbId).catch(() => {});
-      set.dbId = null;
-    }
+    set.pr = null;
+    await _deleteSerie(set);
   }
 
   render();
@@ -1376,17 +1803,12 @@ async function _toggleRound(indices, r) {
     };
     fields.forEach(f => { row[FIELD_DB_COLUMN[f.key]] = set[f.key] ?? null; });
 
-    try {
-      const { data } = await supabase.from('series').insert(row).select().single();
-      if (data) set.dbId = data.id;
-    } catch {
-      set.done = false;
-      showToast('Erreur de sauvegarde', 'error');
-    }
+    await _saveSerie(set, row);
+    _checkRecord(exo, set);
   }
 
   const last = _state.exercices[indices.at(-1)];
-  startRestTimer(last?.sets[r]?.repos ?? APP_CONFIG.defaultRestTime);
+  startRestTimer(last?.sets[r]?.repos ?? APP_CONFIG.defaultRestTime, _nextLabel(indices.at(-1), r));
 
   render();
   _persistState();
@@ -1594,6 +2016,17 @@ async function _confirmFinish() {
             Renseigne ton poids dans ton <a href="#" id="link-profil-poids">profil</a> pour estimer les calories.
           </p>` : ''}
 
+        ${_recordsDuJour().length ? `
+          <div class="recap-section">
+            <p class="recap-section-title">Records du jour</p>
+            <ul class="recap-records">
+              ${_recordsDuJour().map(r => `
+                <li><span class="recap-record-star" aria-hidden="true">★</span>
+                  <span class="recap-record-name">${_esc(r.exercice)}</span>
+                  <span class="recap-record-val">${String(r.poids).replace('.', ',')} kg × ${r.reps}</span></li>`).join('')}
+            </ul>
+          </div>` : ''}
+
         ${shares.length ? `
           <div class="recap-section">
             <p class="recap-section-title">Muscles travaillés</p>
@@ -1633,17 +2066,28 @@ async function _confirmFinish() {
 async function _doFinish(duree, calories, muscles) {
   const notes = document.getElementById('seance-notes-final')?.value.trim() || null;
   closeModal();
-  try {
-    await supabase.from('seances').update({
-      duree_minutes: duree, notes,
-      calories_estimees: calories,
-      muscles_travailles: muscles.length ? muscles : null,
-    }).eq('id', _state.seance.id);
-    await _syncRoutineProgress();
+  const changes = {
+    duree_minutes: duree, notes,
+    calories_estimees: calories,
+    muscles_travailles: muscles.length ? muscles : null,
+  };
+  const records = _recordsDuJour();
+  let error = null;
+  try { ({ error } = await supabase.from('seances').update(changes).eq('id', _state.seance.id)); } catch (e) { error = e; }
+  if (error) {
+    // Hors-ligne : la fin de séance partira avec le reste de la file.
+    enqueueUpdate('seances', _state.seance.id, changes);
+    showToast(`Séance terminée — ${duree} min. Synchro dès que le réseau revient.`, 'success', 5000);
+  } else {
     showToast(`Séance terminée — ${duree} min`, 'success', 4000);
-  } catch {
-    showToast('Erreur lors de la finalisation', 'error');
   }
+  // Records du jour : colonne facultative (seances.records). Si elle
+  // n'existe pas encore, on ignore l'erreur.
+  if (records.length) {
+    try { await supabase.from('seances').update({ records }).eq('id', _state.seance.id); } catch {}
+  }
+  await _syncRoutineProgress();
+  await _syncProgrammeProgress();
   _reset();
 }
 
@@ -1678,8 +2122,43 @@ async function _syncRoutineProgress() {
   }
 }
 
+// Même chose pour une séance lancée depuis un programme : la séance du
+// programme garde les charges réellement faites.
+async function _syncProgrammeProgress() {
+  const ref = _state?.programmeRef;
+  if (!ref?.id || ref.day == null) return;
+  try {
+    const { data: prog, error } = await supabase
+      .from('programmes').select('structure').eq('id', ref.id).single();
+    if (error || !prog) return;
+    const structure = Array.isArray(prog.structure) ? [...prog.structure] : [];
+    const jour = structure[ref.day];
+    if (!jour || typeof jour !== 'object') return;
+
+    const exercices = (jour.exercices ?? []).map(ex => {
+      const performed = _state.exercices.find(e => e.nom === ex.nom);
+      if (!performed) return ex;
+      const fields = metricFields(performed.type_metrique);
+      const series = performed.sets.map((s, i) => {
+        const base = ex.series?.[i] ?? { uid: _uid(), repos: s.repos ?? 90 };
+        const out  = { ...base, type: s.type ?? base.type };
+        fields.forEach(f => { out[f.key] = s[f.key]; });
+        return out;
+      });
+      return { ...ex, type_metrique: performed.type_metrique, repos_inter: performed.repos_inter, series };
+    });
+
+    structure[ref.day] = { ...jour, exercices };
+    await supabase.from('programmes').update({ structure }).eq('id', ref.id);
+  } catch {
+    // Best-effort, comme pour les routines.
+  }
+}
+
 function _reset() {
   _focusBlockIdx = null;
+  clearInterval(_chronoTick); _chronoTick = null;
+  _keepAwake(false);
   clearInterval(_elapsedId);
   _elapsedId = null;
   hideTimer(); // une séance terminée/annulée ne doit pas laisser un repos en cours derrière elle

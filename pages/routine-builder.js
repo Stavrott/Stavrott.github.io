@@ -19,7 +19,7 @@ export function openRoutineBuilder(routine, onSave) {
   _onSave = onSave;
   _state  = routine
     ? JSON.parse(JSON.stringify(routine))
-    : { id: null, nom: 'Nouvelle routine', exercices: [] };
+    : { id: null, nom: 'Nouvelle séance', exercices: [] };
   _state.exercices = (_state.exercices || []).map(_normalizeExo);
   _mount();
 }
@@ -68,7 +68,7 @@ function _mount() {
         </svg>
       </button>
       <input id="rb-nom" class="form-input" type="text" value="${_esc(_state.nom)}"
-        placeholder="Nom de la routine"
+        placeholder="Nom de la séance (ex : Push A)"
         style="flex:1;font-weight:800;font-size:1.05rem;border:none;background:transparent;
           padding:6px 0;box-shadow:none;min-width:0">
       <button id="rb-save" class="btn btn-primary" style="flex-shrink:0">Sauvegarder</button>
@@ -400,7 +400,7 @@ function _equalizeBlock(indices) {
 }
 
 function _syncDOM() {
-  _state.nom = _el.querySelector('#rb-nom')?.value.trim() || 'Nouvelle routine';
+  _state.nom = _el.querySelector('#rb-nom')?.value.trim() || 'Nouvelle séance';
   _state.exercices.forEach(ex => {
     ex.series.forEach(s => {
       const row = _el.querySelector(`[data-sid="${s.uid}"]`);
@@ -623,7 +623,7 @@ async function _pickExo(replaceUid = null) {
 
 async function _save() {
   _syncDOM();
-  if (!_state.nom.trim())       { showToast('Donnez un nom à la routine', 'warning'); return; }
+  if (!_state.nom.trim())       { showToast('Donne un nom à la séance', 'warning'); return; }
   if (!_state.exercices.length) { showToast('Ajoutez au moins un exercice', 'warning'); return; }
   await _onSave?.(_state);
   _close();

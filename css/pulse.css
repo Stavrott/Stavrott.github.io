@@ -523,3 +523,198 @@ body {
 .macro-item.protein .progress-fill { background: var(--color-primary) !important; }
 .macro-item.carbs   .progress-fill { background: var(--color-highlight) !important; }
 .macro-item.fat     .progress-fill { background: var(--text-secondary) !important; }
+
+/* ══════════════════════════════════════════════════════════════════
+   Pulse · lot 3 — séance (focus, chrono, aides), programmes, rappels
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Focus : les boutons d'action restent toujours visibles ────────
+   Le contenu défile ; le bouton « Valider » et la navigation restent
+   collés au-dessus de la barre d'onglets (et de la barre de repos). */
+.focus-main { justify-content: flex-start; padding: var(--space-5) 0 var(--space-4); }
+.focus-setnum { margin-top: var(--space-3); }
+.focus-setnum-big { font-size: 5rem; }
+.focus-setnum.is-warmup .focus-setnum-big { color: var(--text-secondary); }
+.focus-dock {
+  /* .app-main a déjà un padding bas de la hauteur de la barre d'onglets :
+     un sticky se cale sur la zone intérieure, donc bottom: 0 suffit. */
+  position: sticky;
+  bottom: calc(-1 * var(--space-3));
+  z-index: 5;
+  box-shadow: 0 var(--space-8) 0 var(--background);
+  display: flex; flex-direction: column; gap: var(--space-2);
+  margin: 0 calc(-1 * var(--space-4));
+  padding: var(--space-3) var(--space-4) var(--space-3);
+  background: linear-gradient(to bottom, transparent, var(--background) 18px);
+}
+.has-floating-bar .app-main { padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 88px); }
+.focus-dock-main {
+  width: 100%; min-height: 58px; gap: var(--space-2);
+  font-size: var(--font-size-md); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  border-radius: var(--radius-xl);
+}
+.focus-dock-main svg { width: 22px; height: 22px; }
+.focus-dock-row { display: flex; gap: var(--space-2); }
+.focus-dock-row .focus-dock-main { flex: 1; width: auto; }
+.focus-dock-chrono { min-height: 58px; padding: 0 var(--space-4); gap: 6px; border-radius: var(--radius-xl); font-weight: 700; }
+.focus-dock-chrono svg { width: 20px; height: 20px; }
+.focus-dock .focus-nav { padding-bottom: 0; }
+.focus-dot.is-warmup { width: 6px; height: 6px; align-self: center; }
+
+/* Record, suggestion, disques, échauffement */
+.focus-record { font-size: var(--font-size-xs); color: var(--text-muted); }
+.focus-record.is-new {
+  display: inline-flex; padding: 3px 10px; border-radius: var(--radius-full);
+  background: var(--color-highlight-light); color: var(--color-highlight); font-weight: 700;
+}
+.focus-suggest {
+  display: flex; align-items: center; gap: var(--space-3); width: 100%;
+  margin-top: var(--space-3); padding: var(--space-3) var(--space-4);
+  background: var(--surface); border-radius: var(--radius-xl);
+  border: 1px solid var(--border-ember); text-align: left;
+}
+.focus-suggest p { flex: 1; font-size: var(--font-size-sm); line-height: 1.35; }
+.focus-suggest p span { color: var(--text-secondary); font-size: var(--font-size-xs); }
+.focus-suggest .btn { flex-shrink: 0; }
+.focus-plates {
+  margin-top: var(--space-3); padding: 6px 12px; border-radius: var(--radius-full);
+  background: var(--surface); font-size: var(--font-size-xs); font-weight: 600; color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.focus-link {
+  min-height: 44px; padding: 0 var(--space-3); margin-top: var(--space-1);
+  font-size: var(--font-size-sm); font-weight: 600; color: var(--color-primary);
+  text-decoration: underline; text-underline-offset: 4px; background: none;
+}
+
+/* Chrono des exercices en durée */
+.focus-chrono {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-3);
+  width: 100%; margin-top: var(--space-4); padding: var(--space-4);
+  background: var(--surface); border-radius: var(--radius-2xl);
+}
+.focus-chrono-ring { position: relative; width: 168px; height: 168px; }
+@media (max-height: 700px) { .focus-chrono-ring { width: 136px; height: 136px; } .focus-chrono-time { font-size: 2.1rem; } }
+.focus-chrono-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.fc-track { fill: none; stroke: var(--surface-3); stroke-width: 7; }
+.fc-fill  { fill: none; stroke: var(--color-primary); stroke-width: 7; stroke-linecap: round; transition: stroke-dashoffset 250ms linear; }
+.focus-chrono.is-over .fc-fill { stroke: var(--color-highlight); }
+.focus-chrono-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.focus-chrono-time { font-size: 2.6rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.focus-chrono.is-over .focus-chrono-time { color: var(--color-highlight); }
+.focus-chrono-sub { font-size: var(--font-size-xs); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.focus-chrono-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); width: 100%; }
+.focus-chrono-actions .btn { flex: 1; min-width: 0; min-height: 48px; }
+.focus-chrono-go { min-height: 52px; }
+
+/* Synchro hors-ligne */
+.sync-pill {
+  align-self: center; margin-top: var(--space-2);
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: var(--radius-full);
+  background: var(--color-warning-light); color: var(--color-warning);
+  font-size: var(--font-size-xs); font-weight: 600;
+}
+.sync-pill[hidden] { display: none; }
+
+/* Repos : ce qui vient ensuite */
+.timer-next {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  max-width: 300px; padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-xl); background: var(--surface); text-align: center;
+}
+.timer-next[hidden] { display: none; }
+.timer-next-label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
+.timer-next-text { font-size: var(--font-size-sm); font-weight: 600; }
+
+/* Récap : records du jour */
+.recap-records { list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.recap-records li {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4); border-radius: var(--radius-xl);
+  background: var(--color-highlight-light);
+}
+.recap-record-star { color: var(--color-highlight); font-size: 1.1rem; }
+.recap-record-name { flex: 1; font-weight: 600; font-size: var(--font-size-sm); }
+.recap-record-val  { font-weight: 700; font-size: var(--font-size-sm); font-variant-numeric: tabular-nums; }
+
+/* Calendrier : jour de record, jour prévu */
+.reg-cell.is-record { box-shadow: inset 0 0 0 2px var(--color-highlight); }
+.week-strip-day.is-planned:not(.is-done) { box-shadow: inset 0 0 0 1.5px var(--border-strong); color: var(--text-primary); }
+.week-strip-day.is-planned.is-today:not(.is-done) { box-shadow: inset 0 0 0 2px var(--color-primary); }
+
+/* ── Objectif : jours prévus et rappel ─────────────────────────── */
+.goal-plan { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+.goal-plan .goal-editor-label { text-align: center; }
+.goal-plan .goal-editor-label span { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.goal-remind { display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm); flex-wrap: wrap; justify-content: center; }
+.goal-remind input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--color-primary); }
+.goal-remind-time { width: auto; min-height: 40px; padding: 0 var(--space-3); }
+.goal-remind :disabled { opacity: 0.45; }
+.goal-plan-hint { font-size: var(--font-size-xs); color: var(--text-muted); text-align: center; }
+
+/* Puces de jours (objectif, éditeur de programme) */
+.day-chips { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
+.day-chip {
+  width: 38px; height: 38px; border-radius: var(--radius-full);
+  background: var(--surface-3); color: var(--text-secondary);
+  font-size: var(--font-size-sm); font-weight: 700;
+}
+.day-chip.is-on { background: var(--color-primary); color: var(--color-primary-ink); }
+
+/* ── Onglet Séances : actions ──────────────────────────────────── */
+.seances-actions { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-5); }
+.seances-actions > .btn { min-height: 54px; }
+.seances-actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.seances-actions-row .btn { min-height: 46px; }
+
+/* ── Programmes ────────────────────────────────────────────────── */
+.prog-list { display: flex; flex-direction: column; gap: var(--space-4); }
+.prog-card { background: var(--surface); border-radius: var(--radius-2xl); padding: var(--space-4); }
+.prog-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); }
+.prog-card-title { font-size: var(--font-size-lg); font-weight: 700; line-height: 1.25; }
+.prog-card-sub { font-size: var(--font-size-xs); color: var(--text-muted); margin-top: 2px; }
+.prog-days { display: flex; flex-direction: column; gap: var(--space-2); }
+.prog-day {
+  display: flex; align-items: center; gap: var(--space-2);
+  background: var(--surface-2); border-radius: var(--radius-xl); padding: var(--space-2);
+}
+.prog-day-move { display: flex; flex-direction: column; }
+.prog-day-move button {
+  width: 32px; height: 24px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); border-radius: var(--radius-sm);
+}
+.prog-day-move button:disabled { opacity: 0.25; }
+.prog-day-move svg { width: 14px; height: 14px; }
+.prog-day-body { flex: 1; min-width: 0; text-align: left; padding: var(--space-1) 0; }
+.prog-day-name, .prog-day-meta { display: block; }
+.prog-add-day { display: flex; align-items: center; justify-content: center; gap: var(--space-2); }
+.prog-add-day svg { width: 16px; height: 16px; flex-shrink: 0; }
+.prog-card-head svg, .prog-card-head .icon-btn svg { width: 18px; height: 18px; }
+.prog-day-name { font-size: var(--font-size-md); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog-day-meta { font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: 2px; }
+.prog-day-play {
+  width: 44px; height: 44px; flex-shrink: 0; border-radius: var(--radius-full);
+  background: var(--color-primary); color: var(--color-primary-ink);
+  display: flex; align-items: center; justify-content: center;
+}
+.prog-day-play svg { width: 16px; height: 16px; }
+.prog-add-day {
+  width: 100%; min-height: 46px; margin-top: var(--space-2);
+  border: 1.5px dashed var(--border-strong); border-radius: var(--radius-xl);
+  color: var(--text-secondary); font-size: var(--font-size-sm); font-weight: 600;
+}
+.pe-day { background: var(--surface-2); border-radius: var(--radius-xl); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.pe-day-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.pe-day-name { font-weight: 700; font-size: var(--font-size-sm); }
+.pe-day .day-chips { justify-content: flex-start; }
+.pe-day .day-chip { width: 34px; height: 34px; font-size: var(--font-size-xs); }
+.prog-model { background: var(--surface); border-radius: var(--radius-2xl); padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); text-align: left; width: 100%; }
+.prog-model-badge {
+  align-self: flex-start; padding: 3px 10px; border-radius: var(--radius-full);
+  background: var(--color-primary-light); color: var(--color-primary);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.prog-model-title { font-size: var(--font-size-lg); font-weight: 700; }
+.prog-model-desc { font-size: var(--font-size-sm); color: var(--text-secondary); }
+.prog-model-meta { font-size: var(--font-size-xs); color: var(--text-muted); }

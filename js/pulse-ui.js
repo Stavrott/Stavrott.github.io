@@ -81,7 +81,7 @@ export function weekDoneCount(seances) {
   return [...days].filter(k => k >= start).length;
 }
 
-export function weekStripHTML(seances) {
+export function weekStripHTML(seances, planned = []) {
   const names = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
   const letters = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
   const monday = mondayOf();
@@ -93,8 +93,9 @@ export function weekStripHTML(seances) {
         const key = localKey(addDays(monday, i));
         const done = days.has(key);
         const today = key === todayKey;
-        const cls = done ? 'is-done' : today ? 'is-today' : '';
-        const aria = `${names[i]} : ${done ? 'séance faite' : today ? 'aujourd’hui' : 'pas de séance'}`;
+        const plan = planned.includes(i);
+        const cls = (done ? 'is-done' : today ? 'is-today' : '') + (plan ? ' is-planned' : '');
+        const aria = `${names[i]} : ${done ? 'séance faite' : today ? 'aujourd’hui' : plan ? 'séance prévue' : 'pas de séance'}`;
         return `<span class="week-strip-day ${cls}" role="listitem" aria-label="${aria}">${l}</span>`;
       }).join('')}
     </div>`;
@@ -120,7 +121,7 @@ export function goalStreakWeeks(seances, goal) {
 
 // ── Calendrier de régularité (4 semaines, lundi → dimanche) ────────────
 
-export function regularityHTML(seances, goal) {
+export function regularityHTML(seances, goal, recordDays = new Set()) {
   const days = _daysWithSeance(seances);
   const thisMonday = mondayOf();
   const todayKey = localKey(new Date());
@@ -134,7 +135,8 @@ export function regularityHTML(seances, goal) {
       const done = days.has(key);
       if (done) n++;
       const cls = done ? 'is-done' : key === todayKey ? 'is-today' : key > todayKey ? 'is-future' : '';
-      cells.push(`<span class="reg-cell ${cls}"></span>`);
+      const rec = recordDays.has(key) ? ' is-record' : '';
+      cells.push(`<span class="reg-cell ${cls}${rec}"></span>`);
     }
     weeks.push({ cells, n, current: w === 0 });
   }
@@ -166,6 +168,7 @@ export function regularityHTML(seances, goal) {
         <span><i class="reg-cell is-done"></i>Séance</span>
         <span><i class="reg-cell"></i>Repos</span>
         <span><i class="reg-cell is-today"></i>Aujourd’hui</span>
+        ${recordDays.size ? '<span><i class="reg-cell is-done is-record"></i>Record</span>' : ''}
       </div>
     </div>`;
 }

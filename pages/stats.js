@@ -1,6 +1,6 @@
 import { currentUser }  from '../js/auth.js';
 import { supabase }     from '../js/supabase.js';
-import { calc1RM, formatDate, svgLineChart, escapeHtml } from '../js/utils.js';
+import { calc1RM, formatDate, svgLineChart, escapeHtml, localDateStr } from '../js/utils.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 import { goalOf, regularityHTML, muscleShares, muscleWeights, muscleBarsHTML, localKey, mondayOf, addDays } from '../js/pulse-ui.js';
 
@@ -38,18 +38,21 @@ async function _renderResumes(section) {
   try {
     const now      = new Date();
     const dow      = now.getDay(); // 0=dim
-    const weekStart = new Date(Date.now() - (dow === 0 ? 6 : dow - 1) * 86400000).toISOString().split('T')[0];
-    const monthAgo = new Date(now - 30 * 86400000).toISOString().split('T')[0];
+    const weekStart = localDateStr(new Date(Date.now() - (dow === 0 ? 6 : dow - 1) * 86400000));
+    const monthAgo = localDateStr(new Date(now - 30 * 86400000));
 
     const fourWeeks = localKey(addDays(mondayOf(), -21));
-    const [{ data: week }, { data: month }, { data: allSeances }, { data: regSeances }, { data: profil }, { data: seriesMonth }] = await Promise.all([
+    const [{ data: week }, { data: month }, { data: allSeances }, { data: regSeances }, { data: profil }, { data: seriesMonth }, { data: recSeances }] = await Promise.all([
       supabase.from('seances').select('id, duree_minutes, date, calories_estimees, muscles_travailles').eq('user_id', currentUser.id).gte('date', weekStart),
       supabase.from('seances').select('id, duree_minutes, muscles_travailles').eq('user_id', currentUser.id).gte('date', monthAgo),
       supabase.from('seances').select('id').eq('user_id', currentUser.id),
       supabase.from('seances').select('date').eq('user_id', currentUser.id).gte('date', fourWeeks),
       supabase.from('profils').select('frequence').eq('user_id', currentUser.id).maybeSingle(),
       supabase.from('series').select('poids_kg, repetitions').eq('user_id', currentUser.id).gte('created_at', new Date(now - 30 * 86400000).toISOString()),
+      // Colonne facultative seances.records : si elle manque, data = null.
+      Promise.resolve(supabase.from('seances').select('date, records').eq('user_id', currentUser.id).gte('date', fourWeeks)).catch(() => ({ data: null })),
     ]);
+    const recordDays = new Set((recSeances ?? []).filter(x => Array.isArray(x.records) && x.records.length).map(x => x.date));
     const goal         = goalOf(profil?.frequence);
     const monthVolume  = (seriesMonth ?? []).reduce((t, x) => t + (Number(x.poids_kg) || 0) * (Number(x.repetitions) || 0), 0);
     const monthShares  = muscleShares(_muscleCounts(month ?? []));
@@ -70,7 +73,7 @@ async function _renderResumes(section) {
 
       <div class="page-section">
         <h3 class="section-title" style="margin-bottom:var(--space-3)">Régularité</h3>
-        <div class="card">${regularityHTML(regSeances ?? [], goal)}</div>
+        <div class="card">${regularityHTML(regSeances ?? [], goal, recordDays)}</div>
       </div>
 
       <div class="page-section">
@@ -159,11 +162,11 @@ function _frequencyBars(seances) {
   const dayLabels = ['D', 'L', 'M', 'M', 'J', 'V', 'S']; // index = Date#getDay() (0 = dimanche)
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(Date.now() - (6 - i) * 86400000);
-    return { key: d.toISOString().split('T')[0], label: dayLabels[d.getDay()] };
+    return { key: localDateStr(d), label: dayLabels[d.getDay()] };
   });
   const counts  = days.map(({ key }) => seances.filter(s => s.date?.startsWith(key)).length);
   const max     = Math.max(...counts, 1);
-  const todayKey = new Date().toISOString().split('T')[0];
+  const todayKey = localDateStr();
 
   return days.map(({ key, label }, i) => {
     const h     = Math.round((counts[i] / max) * 44);

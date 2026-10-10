@@ -96,6 +96,15 @@ export async function scheduleRestPush(durationSeconds, title, body) {
   return data?.id ?? null;
 }
 
+// Remplace les rappels « séance prévue » programmés côté serveur.
+// items : [{ deliver_at: ISO, body }] ; liste vide = tout annuler.
+export async function scheduleReminders(items) {
+  const ok = await ensurePushSubscription();
+  if (!ok) return false;
+  const data = await _invoke('POST', { kind: 'rappels', items });
+  return !!data?.ok;
+}
+
 export async function cancelRestPush(id) {
   if (!id) return;
   await _invoke('DELETE', { id });

@@ -1,6 +1,6 @@
 import { supabase } from '../js/supabase.js';
 import { currentUser, getUserPrenom, signOut } from '../js/auth.js';
-import { lsSet, lsGet, showToast, confirmDialog } from '../js/utils.js';
+import { lsSet, lsGet, showToast, confirmDialog, localDateStr } from '../js/utils.js';
 
 const LS_KEY = (uid) => `onboarding_done_${uid}`;
 
@@ -356,7 +356,7 @@ async function _finish() {
       try {
         await supabase.from('historique_poids').upsert({
           user_id:  user.id,
-          date:     new Date().toISOString().split('T')[0],
+          date:     localDateStr(),
           poids_kg: _data.poids_kg,
         }, { onConflict: 'user_id,date' });
       } catch { /* non bloquant */ }

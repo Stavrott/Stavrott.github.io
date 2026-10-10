@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v42';
+const CACHE_NAME = 'forme-v43';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -23,6 +23,8 @@ const STATIC_ASSETS = [
   '/js/quick-launch.js',
   '/js/active-bar.js',
   '/js/pulse-ui.js',
+  '/js/sync-queue.js',
+  '/js/reminders.js',
   '/pages/home.js',
   '/pages/seances.js',
   '/pages/seance-active.js',

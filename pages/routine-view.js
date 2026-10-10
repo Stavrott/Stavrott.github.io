@@ -5,6 +5,7 @@ import { showToast }            from '../js/utils.js';
 import { fetchExerciseImage }   from '../js/exercisedb.js';
 import { metricFields, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
 import { MUSCLE_MAP, MUSCLES_TO_GROUP, bodyMapHTML, highlightMuscles } from '../js/body-map.js';
+import { localDateStr } from '../js/utils.js';
 
 const _BODY_MAP_UID = 'rv';
 
@@ -245,7 +246,7 @@ async function _loadChart(routineNom) {
     const days     = { '7j': 7, '1m': 30, '3m': 90, '6m': 180, '1a': 365 }[_chartFilter] ?? 30;
     const since    = new Date();
     since.setDate(since.getDate() - days);
-    const sinceStr = since.toISOString().split('T')[0];
+    const sinceStr = localDateStr(since);
 
     const { data: seances, error: e1 } = await supabase
       .from('seances')
