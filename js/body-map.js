@@ -182,18 +182,21 @@ export function bodyMapHTML(uid) {
   return BODY_SVG_TEMPLATE.replace(/id="([\w-]+)"/g, (_, id) => `id="${id}-${uid}"`);
 }
 
-export function highlightMuscles(container, groups, uid) {
+// `weights` (facultatif) : { groupe: 0 → 1 }. Plus le poids est fort, plus
+// la couleur est franche — le schéma montre alors la répartition, pas
+// seulement la présence d'un muscle.
+export function highlightMuscles(container, groups, uid, weights = null) {
   if (!container) return;
-  const ACTIVE_FILL    = 'var(--color-primary)';
-  const ACTIVE_OPACITY = '0.75';
+  const ACTIVE_FILL = 'var(--color-primary)';
 
   (groups ?? []).forEach(g => {
+    const w = Math.max(0, Math.min(1, weights?.[g] ?? 1));
     (MUSCLE_MAP[g]?.ids ?? []).forEach(id => {
       const el = container.querySelector(`#${id}-${uid}`);
       if (!el) return;
       el.style.fill    = ACTIVE_FILL;
-      el.style.opacity = ACTIVE_OPACITY;
-      el.style.filter  = 'drop-shadow(0 0 4px var(--color-primary-glow-s))';
+      el.style.opacity = (0.3 + 0.7 * w).toFixed(2);
+      el.style.filter  = 'none';
     });
   });
 }

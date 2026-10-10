@@ -22,6 +22,7 @@ const STATIC_ASSETS = [
   '/js/exercisedb.js',
   '/js/quick-launch.js',
   '/js/active-bar.js',
+  '/js/pulse-ui.js',
   '/pages/home.js',
   '/pages/seances.js',
   '/pages/seance-active.js',

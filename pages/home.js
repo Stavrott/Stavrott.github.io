@@ -1,9 +1,13 @@
 import { currentUser, getUserPrenom } from '../js/auth.js';
 import { supabase }                   from '../js/supabase.js';
 import { navigate }                   from '../js/router.js';
-import { formatDate, getGreeting, todayStr, formatDuration, showToast, confirmDialog, escapeHtml } from '../js/utils.js';
+import { formatDate, getGreeting, todayStr, formatDuration, showToast, confirmDialog, escapeHtml, openModal, closeModal } from '../js/utils.js';
 import { openQuickLaunchModal }       from '../js/quick-launch.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
+import {
+  goalOf, goalRingHTML, goalLabel, weekDoneCount, weekStripHTML, goalStreakWeeks, GOAL_LEVELS,
+  muscleShares, muscleWeights, muscleBarsHTML, formatKg, localKey, mondayOf, addDays,
+} from '../js/pulse-ui.js';
 
 // ── Données du tableau de bord ────────────────────────────────────────
 
@@ -12,7 +16,14 @@ async function fetchDashboard(userId) {
   const dow = new Date().getDay();
   const weekStart = new Date(Date.now() - (dow === 0 ? 6 : dow - 1) * 86400000).toISOString().split('T')[0];
 
-  const [{ data: seancesWeek }, { data: seanceToday }, { data: lastSeance }] = await Promise.all([
+  // Douze semaines de dates suffisent pour la série « objectif tenu ».
+  const since = localKey(addDays(mondayOf(), -7 * 11));
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+
+  const [{ data: seancesWeek }, { data: seanceToday }, { data: lastSeance },
+         { data: recent }, { data: profil }, { data: seriesMonth }] = await Promise.all([
     supabase.from('seances')
       .select('id, date, duree_minutes, nom, calories_estimees, muscles_travailles')
       .eq('user_id', userId)
@@ -30,12 +41,30 @@ async function fetchDashboard(userId) {
       .eq('user_id', userId)
       .order('date', { ascending: false })
       .limit(3),
+
+    supabase.from('seances')
+      .select('date')
+      .eq('user_id', userId)
+      .gte('date', since),
+
+    supabase.from('profils')
+      .select('frequence')
+      .eq('user_id', userId)
+      .maybeSingle(),
+
+    supabase.from('series')
+      .select('poids_kg, repetitions')
+      .eq('user_id', userId)
+      .gte('created_at', monthStart.toISOString()),
   ]);
 
   return {
     seancesWeek: seancesWeek ?? [],
     seanceToday: seanceToday ?? null,
     lastSeances: lastSeance ?? [],
+    recent:      recent ?? [],
+    frequence:   profil?.frequence ?? null,
+    seriesMonth: seriesMonth ?? [],
   };
 }
 
@@ -54,7 +83,17 @@ function _buildCtx(prenom, dash) {
   const totalMin     = dash.seancesWeek.reduce((s, x) => s + (x.duree_minutes || 0), 0);
   const weekCalories = dash.seancesWeek.reduce((s, x) => s + (x.calories_estimees || 0), 0);
   const weekMuscles  = _muscleCounts(dash.seancesWeek);
-  return { prenom, dash, seancesCount, totalMin, weekCalories, weekMuscles };
+
+  const goal        = goalOf(dash.frequence);
+  const recent      = dash.recent ?? [];
+  const weekDone    = weekDoneCount(recent);
+  const streak      = goalStreakWeeks(recent, goal);
+  const monthKey    = localKey(new Date()).slice(0, 7);
+  const monthCount  = new Set(recent.map(s => String(s.date)).filter(d => d.startsWith(monthKey))).size;
+  const monthVolume = (dash.seriesMonth ?? []).reduce((t, x) => t + (Number(x.poids_kg) || 0) * (Number(x.repetitions) || 0), 0);
+
+  return { prenom, dash, seancesCount, totalMin, weekCalories, weekMuscles,
+           goal, recent, weekDone, streak, monthCount, monthVolume };
 }
 
 // ── Widgets de l'accueil ────────────────────────────────────────────────
@@ -64,6 +103,8 @@ function _buildCtx(prenom, dash) {
 
 const WIDGETS = {
   greeting:       { label: 'Salutation',              render: _renderGreeting },
+  goal:           { label: 'Objectif de la semaine',  render: _renderGoal },
+  highlights:     { label: 'Chiffres clés',           render: _renderHighlights },
   'week-stats':   { label: 'Stats de la semaine',     render: _renderWeekStats },
   'week-activity': { label: 'Activité de la semaine', render: _renderWeekActivity },
   'start-button': { label: 'Bouton démarrer',         render: _renderStartButton },
@@ -72,13 +113,25 @@ const WIDGETS = {
   'last-seances': { label: 'Dernières séances',       render: _renderLastSeancesWidget },
 };
 
-const DEFAULT_LAYOUT = Object.keys(WIDGETS).map(id => ({ id, hidden: false }));
+// Disposition « Pulse » : l'objectif hebdo en tête, puis l'action, puis
+// le détail. Les anciens blocs restent disponibles dans Personnaliser.
+const DEFAULT_LAYOUT = [
+  { id: 'greeting',      hidden: false },
+  { id: 'goal',          hidden: false },
+  { id: 'start-button',  hidden: false },
+  { id: 'highlights',    hidden: false },
+  { id: 'last-seances',  hidden: false },
+  { id: 'muscles',       hidden: false },
+  { id: 'shortcuts',     hidden: true },
+  { id: 'week-stats',    hidden: true },
+  { id: 'week-activity', hidden: true },
+];
 
 function _renderGreeting(ctx) {
   return `
     <div class="page-section" data-widget="greeting">
-      <h2 style="font-size:var(--font-size-2xl);font-weight:800;margin-bottom:4px">
-        ${getGreeting()}, ${escapeHtml(ctx.prenom)} 👋
+      <h2 style="font-size:var(--font-size-xl);font-weight:700;margin-bottom:2px">
+        ${getGreeting()}, ${escapeHtml(ctx.prenom)}
       </h2>
       <p style="color:var(--text-secondary);font-size:var(--font-size-sm)">
         ${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -119,12 +172,100 @@ function _renderMuscles(ctx) {
   if (!ctx.weekMuscles.length) return '';
   return `
     <div class="card page-section" data-widget="muscles" style="padding:var(--space-4)">
-      <p class="card-title" style="margin-bottom:var(--space-3)">Muscles travaillés</p>
+      <p class="card-title" style="margin-bottom:var(--space-3)">Muscles travaillés cette semaine</p>
       ${bodyMapHTML('home')}
-      <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:center;margin-top:var(--space-3)">
-        ${ctx.weekMuscles.map(([m, c]) => `<span class="muscle-tag">${escapeHtml(m)}${c > 1 ? ` ×${c}` : ''}</span>`).join('')}
+      <div style="margin-top:var(--space-4)">${muscleBarsHTML(muscleShares(ctx.weekMuscles))}</div>
+    </div>`;
+}
+
+const _SVG_PENCIL = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>`;
+const _SVG_FLAME  = `<svg viewBox="0 0 24 24" aria-hidden="true" style="fill:var(--color-primary)"><path d="M12 2c-1.5 3-5 5.5-5 10a5 5 0 0010 0c0-1-.3-2-.8-2.8.3 1.8-.5 3-1.7 3-1.5 0-2-1.3-1.5-2.7C13.8 8 12 5 12 2z"/></svg>`;
+
+function _renderGoal(ctx) {
+  return `
+    <div class="page-section goal-card" data-widget="goal">
+      <div class="goal-head">
+        ${goalRingHTML(ctx.weekDone, ctx.goal)}
+        <div class="goal-text">
+          <p class="goal-eyebrow">Cette semaine</p>
+          <p class="goal-title">${goalLabel(ctx.weekDone, ctx.goal)}</p>
+          <button class="goal-edit" id="btn-edit-goal">${_SVG_PENCIL}Objectif : ${ctx.goal} / semaine</button>
+        </div>
+      </div>
+      ${weekStripHTML(ctx.recent)}
+    </div>`;
+}
+
+function _renderHighlights(ctx) {
+  return `
+    <div class="page-section highlight-row" data-widget="highlights">
+      <div class="highlight-pill">
+        <p class="highlight-value">${formatKg(ctx.monthVolume)}</p>
+        <p class="highlight-label">soulevés ce mois</p>
+      </div>
+      <div class="highlight-pill">
+        <p class="highlight-value">${ctx.monthCount}</p>
+        <p class="highlight-label">séance${ctx.monthCount > 1 ? 's' : ''} ce mois</p>
+      </div>
+      <div class="highlight-pill">
+        <p class="highlight-value">${_SVG_FLAME}${ctx.streak} sem.</p>
+        <p class="highlight-label">objectif tenu d'affilée</p>
       </div>
     </div>`;
+}
+
+// ── Objectif hebdo : réglage ─────────────────────────────────────────
+// L'objectif est la « fréquence » du profil (déjà demandée à l'onboarding),
+// désormais réglable de 1 à 7 séances par semaine.
+
+function _openGoalModal() {
+  let n = _dashCtx.goal;
+  const body = () => `
+    <div class="goal-editor">
+      <p class="goal-editor-label">Séances par semaine</p>
+      <div class="goal-editor-row">
+        <button class="goal-editor-btn" data-goal-step="-1" aria-label="Une séance de moins" ${n <= 1 ? 'disabled' : ''}>−</button>
+        <span class="goal-editor-value" aria-live="polite">${n}</span>
+        <button class="goal-editor-btn" data-goal-step="1" aria-label="Une séance de plus" ${n >= 7 ? 'disabled' : ''}>+</button>
+      </div>
+      <p class="goal-editor-level">${GOAL_LEVELS[n][0]}</p>
+      <p class="goal-editor-desc">${GOAL_LEVELS[n][1]}</p>
+    </div>`;
+
+  openModal({
+    title: 'Mon objectif hebdo',
+    body: body(),
+    footer: `
+      <button class="btn btn-secondary" id="btn-goal-cancel">Annuler</button>
+      <button class="btn btn-primary" id="btn-goal-save" style="flex:1">Enregistrer</button>`,
+  });
+
+  const mb = document.getElementById('modal-body');
+  // Affectation (et non addEventListener) : #modal-body est réutilisé par
+  // toutes les modales, un écouteur ajouté à chaque ouverture s'empilerait.
+  mb.onclick = (e) => {
+    const b = e.target.closest('[data-goal-step]');
+    if (!b) return;
+    n = Math.max(1, Math.min(7, n + parseInt(b.dataset.goalStep, 10)));
+    mb.innerHTML = body();
+  };
+  const done = () => { mb.onclick = null; closeModal(); };
+
+  document.getElementById('btn-goal-cancel')?.addEventListener('click', done);
+  document.getElementById('btn-goal-save')?.addEventListener('click', async () => {
+    try {
+      const { error } = await supabase.from('profils')
+        .upsert({ user_id: currentUser.id, frequence: n }, { onConflict: 'user_id' });
+      if (error) throw error;
+      done();
+      showToast('Objectif enregistré', 'success');
+      _dashCtx.goal   = n;
+      _dashCtx.streak = goalStreakWeeks(_dashCtx.recent, n);
+      _render();
+    } catch {
+      showToast('L\'objectif n\'a pas pu être enregistré', 'error');
+    }
+  });
 }
 
 function _renderStartButton() {
@@ -134,7 +275,7 @@ function _renderStartButton() {
         <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px">
           <polygon points="6 4 20 12 6 20"/>
         </svg>
-        Démarrer une séance
+        Lancer une séance
       </button>
     </div>`;
 }
@@ -270,10 +411,11 @@ async function _fetchLayout() {
     if (!Array.isArray(saved) || !saved.length) return DEFAULT_LAYOUT.map(w => ({ ...w }));
 
     const merged = saved.filter(w => WIDGETS[w?.id]).map(w => ({ id: w.id, hidden: !!w.hidden }));
-    const knownIds = new Set(merged.map(w => w.id));
-    for (const id of Object.keys(WIDGETS)) {
-      if (!knownIds.has(id)) merged.push({ id, hidden: false });
-    }
+    // Un bloc ajouté depuis la dernière personnalisation (ex. l'objectif
+    // hebdo) prend sa place par défaut au lieu d'atterrir tout en bas.
+    DEFAULT_LAYOUT.forEach((w, i) => {
+      if (!merged.some(m => m.id === w.id)) merged.splice(Math.min(i, merged.length), 0, { ...w });
+    });
     return merged;
   } catch {
     return DEFAULT_LAYOUT.map(w => ({ ...w }));
@@ -356,7 +498,8 @@ function _render() {
   _section.innerHTML = _customizeButtonHTML() + widgetsHtml;
 
   if (_section.querySelector('[data-widget="muscles"]')) {
-    highlightMuscles(_section, groupsFromMuscleNames(_dashCtx.weekMuscles.map(([m]) => m)), 'home');
+    const shares = muscleShares(_dashCtx.weekMuscles);
+    highlightMuscles(_section, shares.map(x => x.group), 'home', muscleWeights(shares));
   }
 
   _bindNormalEvents();
@@ -365,6 +508,7 @@ function _render() {
 function _bindNormalEvents() {
   _section.querySelector('#btn-customize-home')?.addEventListener('click', () => { _editMode = true; _render(); });
   _section.querySelector('#btn-start-seance')?.addEventListener('click', () => openQuickLaunchModal());
+  _section.querySelector('#btn-edit-goal')?.addEventListener('click', _openGoalModal);
 
   _section.querySelectorAll('[data-nav]').forEach((btn) => {
     btn.addEventListener('click', () => navigate(btn.dataset.nav));
@@ -497,7 +641,7 @@ export async function loadHome(section) {
     </div>`;
 
   const [dash, layout] = await Promise.all([
-    fetchDashboard(currentUser.id).catch(() => ({ seancesWeek: [], seanceToday: null, lastSeances: [] })),
+    fetchDashboard(currentUser.id).catch(() => ({ seancesWeek: [], seanceToday: null, lastSeances: [], recent: [], frequence: null, seriesMonth: [] })),
     _fetchLayout(),
   ]);
 

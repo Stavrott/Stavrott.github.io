@@ -2,6 +2,7 @@ import { currentUser }  from '../js/auth.js';
 import { supabase }     from '../js/supabase.js';
 import { calc1RM, formatDate, svgLineChart, escapeHtml } from '../js/utils.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
+import { goalOf, regularityHTML, muscleShares, muscleWeights, muscleBarsHTML, localKey, mondayOf, addDays } from '../js/pulse-ui.js';
 
 // ── Point d'entrée ────────────────────────────────────────────────────
 
@@ -40,11 +41,18 @@ async function _renderResumes(section) {
     const weekStart = new Date(Date.now() - (dow === 0 ? 6 : dow - 1) * 86400000).toISOString().split('T')[0];
     const monthAgo = new Date(now - 30 * 86400000).toISOString().split('T')[0];
 
-    const [{ data: week }, { data: month }, { data: allSeances }] = await Promise.all([
+    const fourWeeks = localKey(addDays(mondayOf(), -21));
+    const [{ data: week }, { data: month }, { data: allSeances }, { data: regSeances }, { data: profil }, { data: seriesMonth }] = await Promise.all([
       supabase.from('seances').select('id, duree_minutes, date, calories_estimees, muscles_travailles').eq('user_id', currentUser.id).gte('date', weekStart),
-      supabase.from('seances').select('id, duree_minutes').eq('user_id', currentUser.id).gte('date', monthAgo),
+      supabase.from('seances').select('id, duree_minutes, muscles_travailles').eq('user_id', currentUser.id).gte('date', monthAgo),
       supabase.from('seances').select('id').eq('user_id', currentUser.id),
+      supabase.from('seances').select('date').eq('user_id', currentUser.id).gte('date', fourWeeks),
+      supabase.from('profils').select('frequence').eq('user_id', currentUser.id).maybeSingle(),
+      supabase.from('series').select('poids_kg, repetitions').eq('user_id', currentUser.id).gte('created_at', new Date(now - 30 * 86400000).toISOString()),
     ]);
+    const goal         = goalOf(profil?.frequence);
+    const monthVolume  = (seriesMonth ?? []).reduce((t, x) => t + (Number(x.poids_kg) || 0) * (Number(x.repetitions) || 0), 0);
+    const monthShares  = muscleShares(_muscleCounts(month ?? []));
 
     const weekCount   = week?.length  ?? 0;
     const monthCount  = month?.length ?? 0;
@@ -55,6 +63,16 @@ async function _renderResumes(section) {
     const weekMuscles  = _muscleCounts(week ?? []);
 
     content.innerHTML = `
+      <div class="page-section stats-hero">
+        <p class="stats-hero-label">Volume · 30 derniers jours</p>
+        <p class="stats-hero-value">${Math.round(monthVolume).toLocaleString('fr-FR')}<span> kg</span></p>
+      </div>
+
+      <div class="page-section">
+        <h3 class="section-title" style="margin-bottom:var(--space-3)">Régularité</h3>
+        <div class="card">${regularityHTML(regSeances ?? [], goal)}</div>
+      </div>
+
       <div class="page-section">
         <h3 class="section-title" style="margin-bottom:var(--space-3)">Cette semaine</h3>
         <div class="grid-3">
@@ -80,6 +98,15 @@ async function _renderResumes(section) {
           </div>
         </div>` : ''}
       </div>
+
+      ${monthShares.length ? `
+      <div class="page-section">
+        <h3 class="section-title" style="margin-bottom:var(--space-3)">Répartition musculaire · 30 jours</h3>
+        <div class="card" style="padding:var(--space-4)">
+          ${bodyMapHTML('stats-month')}
+          <div style="margin-top:var(--space-4)">${muscleBarsHTML(monthShares)}</div>
+        </div>
+      </div>` : ''}
 
       <div class="page-section">
         <h3 class="section-title" style="margin-bottom:var(--space-3)">Ce mois</h3>
@@ -110,7 +137,9 @@ async function _renderResumes(section) {
         <p class="card-value">${totalCount} <span>depuis le début</span></p>
       </div>`;
 
-    highlightMuscles(content, groupsFromMuscleNames(weekMuscles.map(([m]) => m)), 'stats-week');
+    const weekShares = muscleShares(weekMuscles);
+    highlightMuscles(content, weekShares.map(x => x.group), 'stats-week', muscleWeights(weekShares));
+    highlightMuscles(content, monthShares.map(x => x.group), 'stats-month', muscleWeights(monthShares));
   } catch {
     content.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:var(--space-6)">Erreur de chargement</p>`;
   }

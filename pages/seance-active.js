@@ -6,6 +6,7 @@ import { APP_CONFIG }                 from '../js/config.js';
 import { metricFields, parseFieldValue, fieldByKey, FIELD_DB_COLUMN, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
 import { SET_TYPES, DEFAULT_SET_TYPE, setTypeOf, isWorkingSet, setTypeLabel, setTypeClass } from '../js/set-types.js';
 import { estimateCaloriesSeance, musclesTravailles } from '../js/calories.js';
+import { muscleShares, muscleWeights, muscleBarsHTML, formatKg } from '../js/pulse-ui.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 import { getPoidsActuel } from './profil.js';
 import { navigate } from '../js/router.js';
@@ -21,6 +22,14 @@ let _elapsedId  = null;
 let _lastActiveExoIndex = null; // dernier exercice dont une série a été validée — sert à déterminer "en cours" / "prochain" pour la barre flottante
 
 const _setTimers = new Map(); // timers actifs par série, clé `${ei}_${si}`
+
+// ── Vue « focus » (un exercice à la fois) ou « liste » (toute la séance) ──
+// Le focus est la vue par défaut ; la liste reste l'endroit où l'on
+// réordonne, remplace, ajoute ou transforme en superset. Le choix est
+// mémorisé sur l'appareil.
+const _VIEW_KEY = 'forme_seance_vue';
+let _viewMode = (() => { try { return localStorage.getItem(_VIEW_KEY) || 'focus'; } catch { return 'focus'; } })();
+let _focusBlockIdx = null; // bloc choisi à la main ; null = suivre la progression
 
 // ── Persistance localStorage (survie aux rechargements SW) ────────────
 
@@ -279,9 +288,21 @@ function _colWidths(fields) {
 
 // ── Rendu principal ───────────────────────────────────────────────────
 
+function _setViewMode(mode) {
+  _viewMode = mode;
+  try { localStorage.setItem(_VIEW_KEY, mode); } catch {}
+  render();
+  _section?.closest('.app-main')?.scrollTo?.({ top: 0 });
+}
+
 function render() {
   _clearAllTimers();
   if (!_section || !_state) return;
+
+  if (_viewMode === 'focus' && _state.exercices.length) {
+    _renderFocus();
+    return;
+  }
 
   const exoCount = _state.exercices.length;
   const setsDone = _state.exercices.reduce((n, e) => n + e.sets.filter(s => s.done).length, 0);
@@ -301,7 +322,14 @@ function render() {
       </button>
     </div>
 
-    <h2 class="seance-active-title">${_state.seance.nom}</h2>
+    <div class="seance-list-head">
+      <h2 class="seance-active-title">${_esc(_state.seance.nom)}</h2>
+      ${exoCount ? `
+        <button class="btn btn-secondary btn-sm" id="btn-view-focus">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><circle cx="12" cy="12" r="3"/><path d="M3 9V5a2 2 0 012-2h4M15 3h4a2 2 0 012 2v4M21 15v4a2 2 0 01-2 2h-4M9 21H5a2 2 0 01-2-2v-4"/></svg>
+          Mode focus
+        </button>` : ''}
+    </div>
 
     <div id="exo-cards-list">
       ${blocks.map((b, bi) =>
@@ -337,6 +365,149 @@ function _statsLabel(exoCount, setsDone) {
   const e = exoCount === 0 ? 'Aucun exercice' : `${exoCount} exercice${exoCount > 1 ? 's' : ''}`;
   const s = setsDone > 0 ? ` • ${setsDone} série${setsDone > 1 ? 's' : ''}` : '';
   return e + s;
+}
+
+
+// ── Vue focus ─────────────────────────────────────────────────────────
+
+const _SVG_LIST  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1" fill="currentColor"/><circle cx="3.5" cy="12" r="1" fill="currentColor"/><circle cx="3.5" cy="18" r="1" fill="currentColor"/></svg>`;
+const _SVG_CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
+const _SVG_PREV  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>`;
+const _SVG_NEXT  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>`;
+
+// Bloc affiché : celui choisi à la main, sinon le bloc en cours s'il lui
+// reste des séries, sinon le prochain bloc qui en a.
+function _focusIndex(blocks) {
+  if (_focusBlockIdx != null && _focusBlockIdx < blocks.length) return _focusBlockIdx;
+  const a = _activeBlockIndex(blocks);
+  if (a !== -1 && _blockPendingRound(blocks[a]) !== -1) return a;
+  const next = _firstPendingBlockIndex(blocks, a === -1 ? 0 : a + 1);
+  if (next !== -1) return next;
+  const first = _firstPendingBlockIndex(blocks, 0);
+  return first !== -1 ? first : Math.max(0, a);
+}
+
+function _focusStepperHTML(exo, ei, r, compact) {
+  const set = exo.sets[r];
+  if (!set) return `<p class="focus-note">Pas de série ${r + 1} pour cet exercice.</p>`;
+  return `
+    <div class="focus-steppers ${compact ? 'is-compact' : ''}">
+      ${metricFields(exo.type_metrique).map(f => `
+        <div class="focus-stepper">
+          <button class="focus-step-btn" data-action="focus-step" data-exo="${ei}" data-set="${r}" data-field="${f.key}" data-dir="-1"
+            aria-label="Diminuer ${_esc(f.header.toLowerCase())}">−</button>
+          <label class="focus-step-mid">
+            <span class="focus-step-label">${_esc(f.header)}</span>
+            <input class="focus-step-input" type="number" inputmode="${f.type === 'int' ? 'numeric' : 'decimal'}"
+              step="${f.step}" min="0" placeholder="0" value="${set[f.key] ?? ''}"
+              data-field="${f.key}" data-exo="${ei}" data-set="${r}">
+          </label>
+          <button class="focus-step-btn" data-action="focus-step" data-exo="${ei}" data-set="${r}" data-field="${f.key}" data-dir="1"
+            aria-label="Augmenter ${_esc(f.header.toLowerCase())}">+</button>
+        </div>`).join('')}
+    </div>`;
+}
+
+function _renderFocus() {
+  const blocks   = _buildBlocks(_state.exercices);
+  const bi       = _focusIndex(blocks);
+  const block    = blocks[bi];
+  const indices  = block.type === 'single' ? [block.index] : block.indices;
+  const total    = _blockRoundsTotal(block);
+  const pending  = _blockPendingRound(block);
+  const r        = pending === -1 ? Math.max(0, total - 1) : pending;
+  const allSets  = _state.exercices.reduce((n, e) => n + e.sets.length, 0);
+  const doneSets = _state.exercices.reduce((n, e) => n + e.sets.filter(x => x.done).length, 0);
+  const progress = allSets ? Math.round((doneSets * 100) / allSets) : 0;
+  const allDone  = blocks.every(b => _blockPendingRound(b) === -1);
+  const superset = indices.length > 1;
+  const first    = _state.exercices[indices[0]];
+  const prevBlock = bi > 0 ? blocks[bi - 1] : null;
+  const nextBlock = bi < blocks.length - 1 ? blocks[bi + 1] : null;
+
+  const dots = Array.from({ length: total }, (_, k) => {
+    const cls = _blockRoundDone(block, k) ? 'is-done' : k === pending ? 'is-current' : '';
+    return `<span class="focus-dot ${cls}"></span>`;
+  }).join('');
+
+  const validateAttrs = superset
+    ? `data-action="toggle-round" data-indices="${indices.join(',')}" data-round="${r}"`
+    : `data-action="toggle-done" data-exo="${indices[0]}" data-set="${r}"`;
+
+  _section.innerHTML = `
+    <div class="focus-view" id="focus-root">
+      <div class="focus-progress" role="progressbar" aria-label="Avancement de la séance"
+        aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}">
+        <div class="focus-progress-fill" style="width:${progress}%"></div>
+      </div>
+
+      <div class="focus-top">
+        <button class="focus-pill" data-action="view-list" aria-label="Voir et réordonner les exercices de la séance">
+          ${_SVG_LIST}Exercice ${bi + 1} / ${blocks.length}
+        </button>
+        <span class="focus-elapsed" id="session-elapsed">${formatTime(getElapsedSeconds())}</span>
+        <button class="btn btn-secondary btn-sm" id="btn-finish-seance">Terminer</button>
+      </div>
+
+      <div class="focus-main">
+        ${superset ? `<p class="focus-eyebrow">Superset · ${indices.length} exercices</p>` : ''}
+        <h2 class="focus-title" data-action="show-exo-detail" data-exo="${indices[0]}">
+          ${superset ? indices.map(i => _esc(_state.exercices[i].nom)).join(' + ') : _esc(first.nom)}
+        </h2>
+        ${!superset && first.lastPerf ? `<p class="focus-hint">Dernière fois : ${_esc(first.lastPerf)}</p>` : ''}
+
+        ${pending === -1 ? `
+          <div class="focus-done">
+            <span class="focus-done-badge">${_SVG_CHECK}</span>
+            <p class="focus-done-text">${allDone ? 'Toutes les séries sont faites' : 'Exercice terminé'}</p>
+          </div>
+          ${allDone
+            ? `<button class="btn btn-primary focus-cta" data-action="focus-finish">Terminer la séance</button>`
+            : nextBlock ? `<button class="btn btn-primary focus-cta" data-action="focus-go" data-block="${bi + 1}">Exercice suivant</button>` : ''}
+        ` : `
+          <div class="focus-setnum" aria-label="Série ${r + 1} sur ${total}">
+            <span class="focus-setnum-big">${r + 1}</span><span class="focus-setnum-total">/${total}</span>
+          </div>
+          <p class="focus-eyebrow">${superset ? 'Tour en cours' : 'Série en cours'}</p>
+
+          ${indices.map(ei => `
+            ${superset ? `<p class="focus-sub">${_esc(_state.exercices[ei].nom)}</p>` : ''}
+            ${_focusStepperHTML(_state.exercices[ei], ei, r, superset)}`).join('')}
+
+          <button class="focus-validate" ${validateAttrs} aria-label="${superset ? 'Valider le tour' : 'Valider la série'}">${_SVG_CHECK}</button>
+          <p class="focus-validate-label">${superset ? 'Valider le tour' : 'Valider la série'}</p>
+        `}
+
+        <div class="focus-dots" aria-hidden="true">${dots}</div>
+      </div>
+
+      <div class="focus-nav">
+        ${prevBlock
+          ? `<button class="focus-nav-btn" data-action="focus-go" data-block="${bi - 1}">${_SVG_PREV}<span>${_esc(_blockLabel(prevBlock))}</span></button>`
+          : '<span></span>'}
+        ${nextBlock
+          ? `<button class="focus-nav-btn is-next" data-action="focus-go" data-block="${bi + 1}"><span>Suivant : ${_esc(_blockLabel(nextBlock))}</span>${_SVG_NEXT}</button>`
+          : '<span></span>'}
+      </div>
+    </div>`;
+
+  _section.querySelector('#btn-finish-seance')?.addEventListener('click', _confirmFinish);
+  const root = _section.querySelector('#focus-root');
+  root?.addEventListener('click',    _onCardClick);
+  root?.addEventListener('input',    _onInputChange);
+  root?.addEventListener('focusout', _onInputBlur);
+}
+
+function _focusStep(ei, si, key, dir) {
+  const set = _state.exercices[ei]?.sets[si];
+  const f   = fieldByKey(key);
+  if (!set || !f || set.done) return;
+  const input = _section.querySelector(`.focus-step-input[data-field="${key}"][data-exo="${ei}"][data-set="${si}"]`);
+  const cur   = input ? (parseFieldValue(f, input.value) ?? 0) : (set[key] ?? 0);
+  const next  = Math.max(0, Math.round((cur + f.step * dir) * 100) / 100);
+  set[key] = next;
+  if (input) input.value = next;
+  _persistState();
 }
 
 // ── HTML carte exercice simple ─────────────────────────────────────────
@@ -611,6 +782,7 @@ function _supersetRoundHTML(indices, exos, r, nCols, widths, blockHasDuree) {
 
 function _bindEvents() {
   _section.querySelector('#btn-finish-seance')?.addEventListener('click', _confirmFinish);
+  _section.querySelector('#btn-view-focus')?.addEventListener('click', () => { _focusBlockIdx = null; _setViewMode('focus'); });
   _section.querySelector('#btn-add-exo')?.addEventListener('click', () => openExercicePicker());
 
   const cardList = _section.querySelector('#exo-cards-list');
@@ -623,6 +795,14 @@ async function _onCardClick(e) {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
   const { action, exo, set: setIdx, indices, round, dir } = btn.dataset;
+
+  // Vue focus : navigation et réglage des valeurs
+  if (action === 'view-list')   { _setViewMode('list'); return; }
+  if (action === 'focus-go')    { _focusBlockIdx = parseInt(btn.dataset.block, 10); render(); return; }
+  if (action === 'focus-step')  { _focusStep(parseInt(exo), parseInt(setIdx), btn.dataset.field, parseInt(dir)); return; }
+  if (action === 'focus-finish') { _confirmFinish(); return; }
+  // Après une validation, le focus suit à nouveau la progression.
+  if (action === 'toggle-done' || action === 'toggle-round') _focusBlockIdx = null;
 
   if (action === 'remove-exo')     await _removeExo(parseInt(exo));
   if (action === 'replace-exo')    await openExercicePicker(parseInt(exo));
@@ -1379,55 +1559,69 @@ async function _confirmFinish() {
   const calories = estimateCaloriesSeance(_state.exercices, duree, poidsKg);
   const muscles  = musclesTravailles(_state.exercices);
 
+  // Répartition : chaque série validée compte pour les muscles ciblés de
+  // son exercice — le schéma et les barres montrent où est allé l'effort.
+  const muscleCounts = new Map();
+  let volume = 0;
+  for (const e of _state.exercices) {
+    const done = e.sets.filter(x => x.done);
+    if (!done.length) continue;
+    for (const m of e.muscles ?? []) muscleCounts.set(m, (muscleCounts.get(m) ?? 0) + done.length);
+    for (const x of done) volume += (Number(x.poids) || 0) * (Number(x.reps) || 0);
+  }
+  const shares = muscleShares([...muscleCounts.entries()]);
+
+  const _SVG_INFO = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
+
   openModal({
-    title: 'Terminer la séance ?',
+    title: 'Récap de séance',
     body: `
-      <div class="seance-finish-summary">
-        <div class="grid-3">
-          <div class="card" style="text-align:center">
-            <p class="card-label">Durée</p>
-            <p class="card-value" style="font-size:var(--font-size-2xl)">${duree}<span class="card-unit"> min</span></p>
-          </div>
-          <div class="card" style="text-align:center">
-            <p class="card-label">Séries</p>
-            <p class="card-value" style="font-size:var(--font-size-2xl)">${totalSets}</p>
-          </div>
-          <div class="card" style="text-align:center">
-            <p class="card-label">Calories</p>
-            ${calories != null
-              ? `<p class="card-value" style="font-size:var(--font-size-2xl)">${calories}<span class="card-unit"> kcal</span></p>`
-              : `<p class="card-value" style="font-size:var(--font-size-sm);color:var(--text-muted)">—</p>`}
-          </div>
+      <div class="seance-finish-summary recap">
+        <div class="recap-hero">
+          <span class="recap-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></span>
+          <p class="recap-name">${_esc(_state.seance.nom)}</p>
+          <p class="recap-date">${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+        </div>
+
+        <div class="recap-grid">
+          <div class="recap-stat"><p class="recap-stat-label">Durée</p><p class="recap-stat-value">${duree}<span> min</span></p></div>
+          <div class="recap-stat"><p class="recap-stat-label">Volume</p><p class="recap-stat-value">${volume ? formatKg(volume).replace(' kg', '') : '—'}${volume ? '<span> kg</span>' : ''}</p></div>
+          <div class="recap-stat"><p class="recap-stat-label">Séries</p><p class="recap-stat-value">${totalSets}</p></div>
+          <div class="recap-stat"><p class="recap-stat-label">Calories</p><p class="recap-stat-value">${calories != null ? `${calories}<span> kcal</span>` : '—'}</p></div>
         </div>
         ${calories == null ? `
-          <p style="font-size:var(--font-size-xs);color:var(--text-muted);margin-top:var(--space-2);text-align:center">
-            Renseignez votre poids dans votre <a href="#" id="link-profil-poids" style="color:var(--color-primary);font-weight:700">profil</a> pour estimer les calories.
+          <p class="recap-note">
+            Renseigne ton poids dans ton <a href="#" id="link-profil-poids">profil</a> pour estimer les calories.
           </p>` : ''}
-        ${missingFromRoutine.length ? `
-          <div style="margin-top:var(--space-3);padding:var(--space-3);background:var(--color-warning-light);border-radius:var(--radius-md)">
-            <p style="font-size:var(--font-size-xs);font-weight:700;color:var(--color-warning)">⚠️ Exercices de la routine non réalisés</p>
-            <p style="font-size:var(--font-size-xs);color:var(--text-secondary);margin-top:2px">${missingFromRoutine.map(_esc).join(', ')}</p>
+
+        ${shares.length ? `
+          <div class="recap-section">
+            <p class="recap-section-title">Muscles travaillés</p>
+            <div class="recap-bodymap">${bodyMapHTML('finish')}</div>
+            ${muscleBarsHTML(shares)}
           </div>` : ''}
-        ${muscles.length ? `
-          <div style="margin-top:var(--space-4)">
-            <p class="form-label" style="margin-bottom:var(--space-2)">Muscles travaillés</p>
-            ${bodyMapHTML('finish')}
-            <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:center;margin-top:var(--space-3)">
-              ${muscles.map(m => `<span class="muscle-tag">${_esc(m)}</span>`).join('')}
+
+        ${missingFromRoutine.length ? `
+          <div class="recap-info">
+            ${_SVG_INFO}
+            <div>
+              <p class="recap-info-title">Pas fait aujourd'hui : ${missingFromRoutine.map(_esc).join(', ')}</p>
+              <p class="recap-info-desc">Ça reste dans ta routine pour la prochaine fois.</p>
             </div>
           </div>` : ''}
+
         <div class="form-group" style="margin-top:var(--space-4)">
-          <label class="form-label">Notes de séance (facultatif)</label>
+          <label class="form-label" for="seance-notes-final">Notes de séance (facultatif)</label>
           <textarea class="form-input form-textarea" id="seance-notes-final" rows="3"
-            placeholder="Comment s'est passée cette séance ?"></textarea>
+            placeholder="Sensations, douleurs, réglages de machine…"></textarea>
         </div>
       </div>`,
     footer: `
-      <button class="btn btn-secondary" id="btn-continue-seance">Continuer</button>
+      <button class="btn btn-secondary" id="btn-continue-seance">Reprendre</button>
       <button class="btn btn-primary" id="btn-confirm-finish" style="flex:1">Enregistrer</button>`,
   });
 
-  highlightMuscles(document.getElementById('modal-body'), groupsFromMuscleNames(muscles), 'finish');
+  highlightMuscles(document.getElementById('modal-body'), shares.map(x => x.group), 'finish', muscleWeights(shares));
 
   document.getElementById('btn-continue-seance')?.addEventListener('click', closeModal);
   document.getElementById('btn-confirm-finish')?.addEventListener('click', () => _doFinish(duree, calories, muscles));
@@ -1485,6 +1679,7 @@ async function _syncRoutineProgress() {
 }
 
 function _reset() {
+  _focusBlockIdx = null;
   clearInterval(_elapsedId);
   _elapsedId = null;
   hideTimer(); // une séance terminée/annulée ne doit pas laisser un repos en cours derrière elle

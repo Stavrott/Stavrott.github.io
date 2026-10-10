@@ -139,7 +139,9 @@ function _render(section, profil, histPoids) {
 
   const objectif     = OBJECTIFS.find(o => o.value === profil.objectif);
   const niveau       = NIVEAUX.find(n => n.value === profil.niveau);
-  const frequenceLabel = FREQUENCES.find(f => f.value === profil.frequence)?.label ?? null;
+  // L'objectif hebdo se règle désormais de 1 à 7 depuis l'accueil.
+  const frequenceLabel = FREQUENCES.find(f => f.value === profil.frequence)?.label
+    ?? (profil.frequence ? `${profil.frequence}× par semaine` : null);
   const lieuLabel    = labelOf(LIEUX, profil.lieu);
   const sexeLabel    = labelOf(SEXES, profil.sexe);
   const equipements  = Array.isArray(profil.equipements) ? profil.equipements : [];

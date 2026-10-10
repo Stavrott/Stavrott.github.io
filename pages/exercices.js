@@ -516,9 +516,15 @@ function _loadListImages(container) {
     const nom = el.dataset.imgNom;
     fetchExerciseImage(nom).then(url => {
       if (!el.isConnected || !url) return;
-      el.innerHTML = `<img src="${url}" alt="${nom}"
-        style="width:100%;height:100%;object-fit:cover;display:block"
-        onerror="this.parentElement.innerHTML='${_THUMB_FALLBACK.replace(/"/g, "'")}'">`;
+      // L'image ne remplace le pictogramme qu'une fois chargée : hors-ligne
+      // ou en cas d'échec, la vignette garde simplement son pictogramme.
+      // (L'ancien gestionnaire onerror en ligne était mal échappé et levait
+      // une erreur de syntaxe à chaque image manquante.)
+      const img = new Image();
+      img.alt = nom;
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block';
+      img.onload = () => { if (el.isConnected) el.replaceChildren(img); };
+      img.src = url;
     });
   });
 }
