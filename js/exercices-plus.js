@@ -441,9 +441,49 @@ export const EXERCICES_PLUS = [
     'Roller en balade ou fitness.'),
   S('Équitation', 'Cheval', ['Quadriceps', 'Adducteurs', 'Transverse'], 5.5,
     'Séance d\'équitation (pas, trot, galop).'),
+  // ── Cours collectifs ──────────────────────────────────────────────────
+  S('Biking / RPM', 'Vélo de biking', ['Cardio-vasculaire', 'Quadriceps', 'Fessiers', 'Ischio-jambiers'], 8.5,
+    'Cours de vélo en salle en musique (RPM, spinning, biking) : côtes, sprints et récupérations.'),
+  S('Body Pump', 'Barre', ['Quadriceps', 'Pectoraux', 'Dorsaux', 'Épaules', 'Triceps'], 5.5,
+    'Cours de renforcement en musique avec barre et disques légers, beaucoup de répétitions par groupe musculaire.'),
+  S('Body Combat', 'Aucun', ['Cardio-vasculaire', 'Épaules', 'Obliques', 'Quadriceps'], 7.8,
+    'Cours cardio inspiré des sports de combat (boxe, karaté, muay thaï), sans contact.'),
+  S('Body Attack', 'Aucun', ['Cardio-vasculaire', 'Quadriceps', 'Fessiers'], 7.5,
+    'Cours cardio athlétique : courses, sauts, fentes et gainage en musique.'),
+  S('Body Balance', 'Tapis', ['Transverse', 'Ischio-jambiers', 'Érecteurs spinaux'], 3,
+    'Cours mêlant yoga, tai-chi et pilates : souplesse, équilibre et respiration.'),
+  S('Step', 'Step', ['Cardio-vasculaire', 'Quadriceps', 'Fessiers', 'Gastrocnémiens'], 7,
+    'Cours chorégraphié sur une marche (step), à intensité modérée à soutenue.'),
+  S('Zumba', 'Aucun', ['Cardio-vasculaire', 'Quadriceps', 'Fessiers'], 6.5,
+    'Cours de danse fitness sur musiques latines.'),
+  S('Cuisses-abdos-fessiers', 'Tapis', ['Fessiers', 'Quadriceps', 'Grand droit', 'Obliques'], 4.5,
+    'Cours de renforcement ciblé du bas du corps et de la sangle abdominale.'),
+  S('Circuit training', 'Aucun', ['Cardio-vasculaire', 'Quadriceps', 'Pectoraux', 'Transverse'], 8,
+    'Enchaînement d\'ateliers (renforcement et cardio) avec peu de récupération.'),
 ];
 
 // Intensité (MET) des exercices qui en déclarent une, par nom.
 export const MET_PAR_EXERCICE = Object.fromEntries(
   EXERCICES_PLUS.filter(e => e.met).map(e => [e.nom, e.met])
+);
+
+// Illustrations des sports et cours (icons/sports/, dessinées pour Forme) :
+// free-exercise-db n'a pas de photos pour ces activités.
+const _ILLUS = {
+  'Tennis': 'tennis', 'Padel': 'padel', 'Badminton': 'badminton', 'Squash': 'squash',
+  'Tennis de table': 'pingpong', 'Natation': 'natation', 'Natation crawl': 'natation',
+  'Natation brasse': 'brasse', 'Aquagym': 'aquagym', 'Football': 'foot', 'Futsal / foot à 5': 'foot',
+  'Basketball': 'basket', 'Handball': 'handball', 'Volleyball': 'volley', 'Beach-volley': 'beachvolley',
+  'Rugby': 'rugby', 'Course à pied en extérieur': 'course', 'Trail': 'trail', 'Randonnée': 'rando',
+  'Marche nordique': 'nordique', 'Vélo de route': 'velo', 'VTT': 'vtt', 'Boxe': 'boxe',
+  'Arts martiaux': 'martial', 'Escalade': 'escalade', 'CrossFit / WOD': 'kettlebell', 'HIIT': 'hiit',
+  'Yoga': 'yoga', 'Pilates': 'pilates', 'Danse': 'danse', 'Ski alpin': 'ski', 'Ski de fond': 'skifond',
+  'Golf': 'golf', 'Kayak': 'kayak', 'Stand up paddle': 'sup', 'Surf': 'surf', 'Roller': 'roller',
+  'Équitation': 'equitation',
+  'Biking / RPM': 'biking', 'Body Pump': 'pump', 'Body Combat': 'boxe', 'Body Attack': 'hiit',
+  'Body Balance': 'yoga', 'Step': 'step', 'Zumba': 'danse', 'Cuisses-abdos-fessiers': 'pilates',
+  'Circuit training': 'hiit',
+};
+export const ILLUSTRATIONS = Object.fromEntries(
+  Object.entries(_ILLUS).map(([nom, slug]) => [nom, `/icons/sports/${slug}.svg`])
 );

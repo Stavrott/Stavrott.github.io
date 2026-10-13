@@ -3,7 +3,7 @@
 // Source 2 : wger.de (GNU AGPL) — parfois GIF animés, ~900 exercices EN/FR
 // Cache localStorage 60 jours pour éviter les requêtes répétées.
 
-import { EXERCICES_PLUS } from './exercices-plus.js';
+import { EXERCICES_PLUS, ILLUSTRATIONS } from './exercices-plus.js';
 
 const CDN = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises';
 const TTL = 60 * 24 * 60 * 60 * 1000;
@@ -181,6 +181,7 @@ async function _fetchWithTimeout(url, opts = {}, ms = 5000) {
 // l'URL directement — pas de HEAD request qui peut échouer/être mis en cache
 // vide. Le navigateur gère le chargement et son propre cache HTTP.
 export async function fetchExerciseImage(nomFr) {
+  if (ILLUSTRATIONS[nomFr]) return ILLUSTRATIONS[nomFr];
   const folder = IMG_MAP[nomFr];
   if (folder) return `${CDN}/${folder}/0.jpg`;
 
@@ -195,6 +196,7 @@ export async function fetchExerciseImage(nomFr) {
 
 // Retourne jusqu'à 2 URLs pour le diaporama (yuhonas en priorité, wger en fallback).
 export async function fetchExerciseImages(nomFr) {
+  if (ILLUSTRATIONS[nomFr]) return [ILLUSTRATIONS[nomFr]];
   const folder = IMG_MAP[nomFr];
 
   if (folder) {
