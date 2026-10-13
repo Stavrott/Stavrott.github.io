@@ -3,7 +3,7 @@ import { currentUser }          from '../js/auth.js';
 import { EXERCICES }            from './exercices.js';
 import { showToast }            from '../js/utils.js';
 import { fetchExerciseImage }   from '../js/exercisedb.js';
-import { metricFields, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
+import { metricFields, DEFAULT_METRIC_TYPE, formatFieldValue } from '../js/metrics.js';
 import { MUSCLE_MAP, MUSCLES_TO_GROUP, bodyMapHTML, highlightMuscles } from '../js/body-map.js';
 import { localDateStr } from '../js/utils.js';
 
@@ -206,7 +206,7 @@ function _renderExoList(exercices) {
           ${(ex.series ?? []).map(s => `
             ${metricFields(ex.type_metrique).map(f => `
             <p style="text-align:center;font-size:.82rem;font-weight:600;padding:2px 0">
-              ${s[f.key] ?? '—'}
+              ${s[f.key] != null && s[f.key] !== '' ? formatFieldValue(f, s[f.key]) : '—'}
             </p>`).join('')}
             <p style="text-align:center;font-size:.82rem;font-weight:600;padding:2px 0;color:var(--text-muted)">
               ${s.repos ?? 90}s

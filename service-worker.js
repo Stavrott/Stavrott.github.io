@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v47';
+const CACHE_NAME = 'forme-v48';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

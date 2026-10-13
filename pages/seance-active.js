@@ -4,7 +4,7 @@ import { showToast, formatTime, openModal, closeModal, confirmDialog, localDateS
 import { enqueueInsert, enqueueUpdate, enqueueDelete, cancelQueued, patchQueuedInsert, pendingCount } from '../js/sync-queue.js';
 import { startRestTimer, hideTimer }  from '../components/timer.js';
 import { APP_CONFIG }                 from '../js/config.js';
-import { metricFields, parseFieldValue, fieldByKey, FIELD_DB_COLUMN, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
+import { metricFields, parseFieldValue, fieldByKey, FIELD_DB_COLUMN, DEFAULT_METRIC_TYPE, formatFieldValue, formatFieldDisplay, fieldInputAttrs } from '../js/metrics.js';
 import { SET_TYPES, DEFAULT_SET_TYPE, setTypeOf, isWorkingSet, setTypeLabel, setTypeClass } from '../js/set-types.js';
 import { estimateCaloriesSeance, musclesTravailles, sportMinutes } from '../js/calories.js';
 import { muscleShares, muscleWeights, muscleBarsHTML, formatKg } from '../js/pulse-ui.js';
@@ -113,6 +113,9 @@ export async function tryRestoreSeance() {
 }
 
 const _uid = () => Math.random().toString(36).slice(2, 10);
+// Champ d'un exercice : plusieurs types partagent la clé « duree » avec
+// des réglages différents (pas des boutons, unité d'un nombre seul).
+const _fieldOf = (exo, key) => metricFields(exo?.type_metrique).find(x => x.key === key) ?? fieldByKey(key);
 const _esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
 export function hasActiveSeance()   { return _state !== null; }
@@ -438,8 +441,8 @@ function _focusStepperHTML(exo, ei, r, compact) {
             aria-label="Diminuer ${_esc(f.header.toLowerCase())}">−</button>
           <label class="focus-step-mid">
             <span class="focus-step-label">${_esc(f.header)}</span>
-            <input class="focus-step-input" type="number" inputmode="${f.type === 'int' ? 'numeric' : 'decimal'}"
-              step="${f.step}" min="0" placeholder="0" value="${set[f.key] ?? ''}"
+            <input class="focus-step-input" ${fieldInputAttrs(f)}
+              placeholder="0" value="${_esc(formatFieldValue(f, set[f.key]))}"
               data-field="${f.key}" data-exo="${ei}" data-set="${r}">
           </label>
           <button class="focus-step-btn" data-action="focus-step" data-exo="${ei}" data-set="${r}" data-field="${f.key}" data-dir="1"
@@ -701,7 +704,7 @@ function _chronoAction(action) {
   if (action === 'chrono-start') {
     if (!c) {
       const input = _section.querySelector(`.focus-step-input[data-field="duree"][data-exo="${ei}"][data-set="${si}"]`);
-      const target = input ? (parseInt(input.value) || 0) : (Number(set.duree) || 0);
+      const target = input ? (parseFieldValue(_fieldOf(exo, 'duree'), input.value) || 0) : (Number(set.duree) || 0);
       const iso = exo.type_metrique === 'isometrique';
       c = _state.chrono = { ei, si, target, acc: 0, startedAt: iso ? null : Date.now(), countdownUntil: iso ? Date.now() + 3000 : null, alerted: false };
       _audioCtx ??= (() => { try { return new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } })();
@@ -733,13 +736,13 @@ function _focusStep(ei, si, key, dir) {
   const set = exo?.sets[si];
   // Le pas dépend du type de l'exercice : 5 s pour un gainage, 5 min pour
   // un sport, alors que plusieurs types partagent le champ « duree ».
-  const f   = metricFields(exo?.type_metrique).find(x => x.key === key) ?? fieldByKey(key);
+  const f   = _fieldOf(exo, key);
   if (!set || !f || set.done) return;
   const input = _section.querySelector(`.focus-step-input[data-field="${key}"][data-exo="${ei}"][data-set="${si}"]`);
   const cur   = input ? (parseFieldValue(f, input.value) ?? 0) : (set[key] ?? 0);
   const next  = Math.max(0, Math.round((cur + f.step * dir) * 100) / 100);
   set[key] = next;
-  if (input) input.value = next;
+  if (input) input.value = formatFieldValue(f, next);
   _persistState();
 }
 
@@ -821,7 +824,7 @@ function _nextLabel(ei, si) {
     if (!x) return '';
     const fields = metricFields(exo.type_metrique);
     if (fields[0]?.key === 'poids') return `${String(x.poids ?? '?').replace('.', ',')} kg × ${x.reps ?? '?'}`;
-    return fields.map(f => `${x[f.key] ?? '?'} ${f.short}`).join(' · ');
+    return fields.map(f => formatFieldDisplay(f, x[f.key])).join(' · ');
   };
   let bi = _findBlockContaining(blocks, ei);
   for (let i = Math.max(0, bi); i < blocks.length; i++) {
@@ -1019,8 +1022,8 @@ function _setRowHTML(exo, set, ei, si) {
       ${_setNumHTML(exo, set, ei, si)}
       <div class="set-prev" id="setprev-${ei}-${si}">${_esc(prev)}</div>
       ${fields.map((f, i) => `
-        <input class="set-input${done ? ' set-input-done' : ''}" type="number" inputmode="${f.type === 'int' ? 'numeric' : 'decimal'}" step="${f.step}" min="0"
-          placeholder="0" value="${set[f.key] ?? ''}" style="width:${widths[i]}px"
+        <input class="set-input${done ? ' set-input-done' : ''}" ${fieldInputAttrs(f)}
+          placeholder="0" value="${_esc(formatFieldValue(f, set[f.key]))}" style="width:${widths[i]}px"
           data-field="${f.key}" data-exo="${ei}" data-set="${si}">`).join('')}
       ${hasDuree ? `
         <button class="icon-btn" data-action="toggle-timer" data-exo="${ei}" data-set="${si}"
@@ -1145,8 +1148,8 @@ function _supersetRoundHTML(indices, exos, r, nCols, widths, blockHasDuree) {
     const exHasDuree = fields.some(f => f.key === 'duree');
 
     const inputs = fields.map((f, i) => `
-        <input class="set-input${s.done ? ' set-input-done' : ''}" type="number" inputmode="${f.type === 'int' ? 'numeric' : 'decimal'}" step="${f.step}" min="0"
-          placeholder="0" value="${s[f.key] ?? ''}" style="width:${widths[i]}px"
+        <input class="set-input${s.done ? ' set-input-done' : ''}" ${fieldInputAttrs(f)}
+          placeholder="0" value="${_esc(formatFieldValue(f, s[f.key]))}" style="width:${widths[i]}px"
           data-field="${f.key}" data-exo="${ei}" data-set="${r}">`).join('')
       + Array.from({ length: Math.max(0, nCols - fields.length) }, (_, i) =>
           `<span style="width:${widths[fields.length + i]}px;flex-shrink:0"></span>`).join('');
@@ -1251,7 +1254,7 @@ function _onInputChange(e) {
   if (!input) return;
   const { field, exo, set: setIdx } = input.dataset;
   const set = _state.exercices[parseInt(exo)]?.sets[parseInt(setIdx)];
-  const f   = fieldByKey(field);
+  const f   = _fieldOf(_state.exercices[parseInt(exo)], field);
   if (!set || !f) return;
   set[field] = parseFieldValue(f, input.value);
 }
@@ -1260,7 +1263,9 @@ function _onInputChange(e) {
 
 function _blankSet(fields, perf) {
   const set = { repos: null, done: false, dbId: null, type: DEFAULT_SET_TYPE };
-  fields.forEach(f => { set[f.key] = perf?.sets?.[0]?.[f.key] ?? null; });
+  // Sans historique, une durée part de sa valeur par défaut (1 h pour un
+  // sport) ; les autres champs restent vides.
+  fields.forEach(f => { set[f.key] = perf?.sets?.[0]?.[f.key] ?? (f.key === 'duree' ? f.default : null) ?? null; });
   return set;
 }
 
@@ -1597,7 +1602,7 @@ async function _onInputBlur(e) {
   if (!input) return;
   const { field, exo: exoStr, set: setStr } = input.dataset;
   const set = _state.exercices[parseInt(exoStr)]?.sets[parseInt(setStr)];
-  const f   = fieldByKey(field);
+  const f   = _fieldOf(_state.exercices[parseInt(exoStr)], field);
   if (!set || !f || !set.done) return;
   set[field] = parseFieldValue(f, input.value);
   const col = FIELD_DB_COLUMN[field];
@@ -1631,7 +1636,7 @@ function _toggleTimer(ei, si) {
   }
 
   const input     = _section?.querySelector(`input[data-field="duree"][data-exo="${ei}"][data-set="${si}"]`);
-  const targetSec = parseInt(input?.value) || 0;
+  const targetSec = parseFieldValue(_fieldOf(_state.exercices[ei], 'duree'), input?.value) || 0;
   const startMs   = Date.now();
 
   function _fmt(secs) {
@@ -1846,7 +1851,7 @@ async function _fetchLastPerf(nom, type_metrique = DEFAULT_METRIC_TYPE) {
     const best = sets[0];
     const summary = (fields.length === 2 && fields[0].key === 'poids' && fields[1].key === 'reps')
       ? `${best.poids ?? '?'} kg × ${best.reps ?? '?'}`
-      : fields.map(f => `${best[f.key] ?? '?'}${f.short}`).join(' · ');
+      : fields.map(f => formatFieldDisplay(f, best[f.key])).join(' · ');
 
     return { summary, sets };
   } catch {
