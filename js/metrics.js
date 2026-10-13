@@ -31,6 +31,14 @@ export const METRIC_TYPES = {
       { key: 'resistance', header: 'RÉSIST.',   short: 'niv', step: 1,  type: 'float' },
     ],
   },
+  // Sport pratiqué (tennis, natation…) : une durée de jeu ou de pratique,
+  // réglable par pas de 5 minutes, 1 h par défaut.
+  sport: {
+    label: 'Sport — Durée',
+    fields: [
+      { key: 'duree', header: 'DURÉE (S)', short: 's', step: 300, type: 'int', default: 3600 },
+    ],
+  },
 };
 
 export const DEFAULT_METRIC_TYPE = 'kg_reps';

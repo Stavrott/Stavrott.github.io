@@ -3,6 +3,8 @@
 // Source 2 : wger.de (GNU AGPL) — parfois GIF animés, ~900 exercices EN/FR
 // Cache localStorage 60 jours pour éviter les requêtes répétées.
 
+import { EXERCICES_PLUS } from './exercices-plus.js';
+
 const CDN = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises';
 const TTL = 60 * 24 * 60 * 60 * 1000;
 
@@ -110,6 +112,8 @@ const IMG_MAP = {
   'Rameur':                                   'Rowing_Stationary',
   'Escaliers':                                'Stairmaster',
   'Corde à sauter':                           'Rope_Jumping',
+  // ── Bibliothèque étendue (dossiers vérifiés, voir js/exercices-plus.js) ──
+  ...Object.fromEntries(EXERCICES_PLUS.filter(e => e.img).map(e => [e.nom, e.img])),
 };
 
 // ── Cache helpers ──────────────────────────────────────────────────────

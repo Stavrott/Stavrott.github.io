@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v46';
+const CACHE_NAME = 'forme-v47';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -27,6 +27,7 @@ const STATIC_ASSETS = [
   '/js/perf.js',
   '/js/reminders.js',
   '/js/coaching.js',
+  '/js/exercices-plus.js',
   '/pages/home.js',
   '/pages/seances.js',
   '/pages/seance-active.js',

@@ -102,7 +102,11 @@ async function _recomputeFromSeries(id, { EXERCICES, poidsKg, estimateCaloriesSe
   // Durée : intervalle entre la première et la dernière série
   const firstMs = new Date(series[0].created_at).getTime();
   const lastMs  = new Date(series.at(-1).created_at).getTime();
-  const dureeMinutes = Math.max(1, Math.round((lastMs - firstMs) / 60000));
+  // Un sport (tennis, ski…) saisi en durée compte pour sa durée réelle,
+  // même s'il a été enregistré en quelques secondes.
+  const isSport = nom => EXERCICES.find(e => e.nom === nom)?.type_metrique === 'sport';
+  const sportMin = series.filter(s => isSport(s.exercice_nom)).reduce((m, s) => m + (s.duree_s || 0) / 60, 0);
+  const dureeMinutes = Math.max(1, Math.round((lastMs - firstMs) / 60000), Math.round(sportMin));
 
   // Muscles : depuis la bibliothèque d'exercices
   const seenNoms     = [...new Set(series.map(s => s.exercice_nom))];
@@ -117,8 +121,9 @@ async function _recomputeFromSeries(id, { EXERCICES, poidsKg, estimateCaloriesSe
   const exercices = seenNoms.map(nom => {
     const exo = EXERCICES.find(e => e.nom === nom);
     return {
+      nom,
       type_metrique: exo?.type_metrique ?? 'kg_reps',
-      sets: series.filter(s => s.exercice_nom === nom).map(() => ({ done: true })),
+      sets: series.filter(s => s.exercice_nom === nom).map(s => ({ done: true, duree: s.duree_s })),
     };
   });
   const calories = estimateCaloriesSeance(exercices, dureeMinutes, poidsKg);
