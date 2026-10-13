@@ -4,7 +4,7 @@ import { showToast, formatTime, openModal, closeModal, confirmDialog, localDateS
 import { enqueueInsert, enqueueUpdate, enqueueDelete, cancelQueued, patchQueuedInsert, pendingCount } from '../js/sync-queue.js';
 import { startRestTimer, hideTimer }  from '../components/timer.js';
 import { APP_CONFIG }                 from '../js/config.js';
-import { metricFields, parseFieldValue, fieldByKey, FIELD_DB_COLUMN, DEFAULT_METRIC_TYPE, formatFieldValue, formatFieldDisplay, fieldInputAttrs } from '../js/metrics.js';
+import { metricFields, parseFieldValue, fieldByKey, FIELD_DB_COLUMN, DEFAULT_METRIC_TYPE, formatFieldValue, formatFieldDisplay, fieldInputAttrs, isDureeField, formatDuree } from '../js/metrics.js';
 import { SET_TYPES, DEFAULT_SET_TYPE, setTypeOf, isWorkingSet, setTypeLabel, setTypeClass } from '../js/set-types.js';
 import { estimateCaloriesSeance, musclesTravailles, sportMinutes } from '../js/calories.js';
 import { muscleShares, muscleWeights, muscleBarsHTML, formatKg } from '../js/pulse-ui.js';
@@ -116,6 +116,8 @@ const _uid = () => Math.random().toString(36).slice(2, 10);
 // Champ d'un exercice : plusieurs types partagent la clé « duree » avec
 // des réglages différents (pas des boutons, unité d'un nombre seul).
 const _fieldOf = (exo, key) => metricFields(exo?.type_metrique).find(x => x.key === key) ?? fieldByKey(key);
+// Exemple de saisie : « 1h30 » pour un sport, « 45s » pour un gainage.
+const _placeholder = f => isDureeField(f) ? (f.plainUnit === 'min' ? '1h30' : '45s') : '0';
 const _esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
 export function hasActiveSeance()   { return _state !== null; }
@@ -433,22 +435,30 @@ function _focusIndex(blocks) {
 function _focusStepperHTML(exo, ei, r, compact) {
   const set = exo.sets[r];
   if (!set) return `<p class="focus-note">Pas de série ${r + 1} pour cet exercice.</p>`;
+  // Sport : raccourcis de durée sous le compteur, pour ne rien avoir à taper.
+  const quick = exo.type_metrique === 'sport' && !set.done
+    ? `<div class="focus-quick" role="group" aria-label="Durée rapide">
+        ${[1800, 2700, 3600, 5400, 7200].map(v => `
+          <button class="focus-quick-btn ${Number(set.duree) === v ? 'is-on' : ''}" data-action="focus-set" data-exo="${ei}" data-set="${r}"
+            data-field="duree" data-val="${v}">${formatDuree(v)}</button>`).join('')}
+      </div>` : '';
   return `
     <div class="focus-steppers ${compact ? 'is-compact' : ''}">
       ${metricFields(exo.type_metrique).map(f => `
-        <div class="focus-stepper">
+        <div class="focus-stepper ${isDureeField(f) ? 'is-duree' : ''}">
           <button class="focus-step-btn" data-action="focus-step" data-exo="${ei}" data-set="${r}" data-field="${f.key}" data-dir="-1"
             aria-label="Diminuer ${_esc(f.header.toLowerCase())}">−</button>
           <label class="focus-step-mid">
             <span class="focus-step-label">${_esc(f.header)}</span>
             <input class="focus-step-input" ${fieldInputAttrs(f)}
-              placeholder="0" value="${_esc(formatFieldValue(f, set[f.key]))}"
+              placeholder="${_placeholder(f)}" value="${_esc(formatFieldValue(f, set[f.key]))}"
               data-field="${f.key}" data-exo="${ei}" data-set="${r}">
           </label>
           <button class="focus-step-btn" data-action="focus-step" data-exo="${ei}" data-set="${r}" data-field="${f.key}" data-dir="1"
             aria-label="Augmenter ${_esc(f.header.toLowerCase())}">+</button>
         </div>`).join('')}
-    </div>`;
+    </div>
+    ${quick}`;
 }
 
 function _renderFocus() {
@@ -727,6 +737,15 @@ function _chronoAction(action) {
       showToast(`${_fmtChrono(secs)} enregistré pour cette série`, 'success');
     }
   }
+  _persistState();
+  render();
+}
+
+// Raccourci de valeur (durées d'un sport) : remplace la valeur saisie.
+function _focusSet(ei, si, key, val) {
+  const set = _state.exercices[ei]?.sets[si];
+  if (!set || set.done || !Number.isFinite(val)) return;
+  set[key] = val;
   _persistState();
   render();
 }
@@ -1023,7 +1042,7 @@ function _setRowHTML(exo, set, ei, si) {
       <div class="set-prev" id="setprev-${ei}-${si}">${_esc(prev)}</div>
       ${fields.map((f, i) => `
         <input class="set-input${done ? ' set-input-done' : ''}" ${fieldInputAttrs(f)}
-          placeholder="0" value="${_esc(formatFieldValue(f, set[f.key]))}" style="width:${widths[i]}px"
+          placeholder="${_placeholder(f)}" value="${_esc(formatFieldValue(f, set[f.key]))}" style="width:${widths[i]}px"
           data-field="${f.key}" data-exo="${ei}" data-set="${si}">`).join('')}
       ${hasDuree ? `
         <button class="icon-btn" data-action="toggle-timer" data-exo="${ei}" data-set="${si}"
@@ -1149,7 +1168,7 @@ function _supersetRoundHTML(indices, exos, r, nCols, widths, blockHasDuree) {
 
     const inputs = fields.map((f, i) => `
         <input class="set-input${s.done ? ' set-input-done' : ''}" ${fieldInputAttrs(f)}
-          placeholder="0" value="${_esc(formatFieldValue(f, s[f.key]))}" style="width:${widths[i]}px"
+          placeholder="${_placeholder(f)}" value="${_esc(formatFieldValue(f, s[f.key]))}" style="width:${widths[i]}px"
           data-field="${f.key}" data-exo="${ei}" data-set="${r}">`).join('')
       + Array.from({ length: Math.max(0, nCols - fields.length) }, (_, i) =>
           `<span style="width:${widths[fields.length + i]}px;flex-shrink:0"></span>`).join('');
@@ -1216,6 +1235,7 @@ async function _onCardClick(e) {
   if (action === 'view-list')   { _setViewMode('list'); return; }
   if (action === 'focus-go')    { _focusBlockIdx = parseInt(btn.dataset.block, 10); render(); return; }
   if (action === 'focus-step')  { _focusStep(parseInt(exo), parseInt(setIdx), btn.dataset.field, parseInt(dir)); return; }
+  if (action === 'focus-set')   { _focusSet(parseInt(exo), parseInt(setIdx), btn.dataset.field, Number(btn.dataset.val)); return; }
   if (action === 'focus-finish') { _confirmFinish(); return; }
   if (action?.startsWith('chrono-')) { _chronoAction(action); return; }
   if (action === 'apply-suggest') { _applySuggestion(parseInt(exo)); return; }

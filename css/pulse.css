@@ -514,6 +514,15 @@ body {
 .focus-stepper { padding: 6px; gap: 2px; }
 .focus-step-mid { width: 52px; }
 .focus-step-input { font-size: 1.375rem; }
+/* Une durée (« 1h30 », « 2min30s ») a besoin de plus de place qu'un nombre. */
+.focus-stepper.is-duree .focus-step-mid { width: 108px; }
+.focus-quick { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); margin-top: var(--space-3); }
+.focus-quick-btn {
+  min-height: 40px; padding: 0 14px; border-radius: var(--radius-full);
+  background: var(--surface); color: var(--text-secondary);
+  font-size: var(--font-size-sm); font-weight: 700;
+}
+.focus-quick-btn.is-on { background: var(--color-primary); color: var(--color-primary-ink); }
 
 /* ── Nutrition : macros en trois cartes, couleurs de la charte ─── */
 .macro-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
