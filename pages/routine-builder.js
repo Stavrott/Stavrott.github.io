@@ -1,7 +1,7 @@
 import { showToast, confirmDialog } from '../js/utils.js';
 import { getAllExercices, openCreateExerciceModal } from './exercices.js';
 import { fetchExerciseImage }  from '../js/exercisedb.js';
-import { metricFields, parseFieldValue, defaultFieldValue, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
+import { metricFields, parseFieldValue, defaultFieldValue, DEFAULT_METRIC_TYPE, formatFieldValue, fieldInputAttrs } from '../js/metrics.js';
 
 const DEFAULT_REPOS_SERIE = 90;
 const DEFAULT_REPOS_INTER = 120;
@@ -201,8 +201,8 @@ function _serieHTML(s, exUid, type_metrique) {
       style="${_rowGrid(type_metrique)};align-items:center;margin-bottom:4px">
       ${metricFields(type_metrique).map(f => `
         <input class="form-input rb-field" data-field="${f.key}" data-sid="${s.uid}" data-exo="${exUid}"
-          type="number" step="${f.step}" min="0" inputmode="${f.type === 'int' ? 'numeric' : 'decimal'}"
-          value="${s[f.key] ?? ''}" placeholder="—"
+          ${fieldInputAttrs(f)}
+          value="${formatFieldValue(f, s[f.key])}" placeholder="—"
           style="text-align:center;padding:5px 2px;font-size:.88rem;font-weight:600;min-width:0">`).join('')}
       <button class="rb-repos-btn chip" data-sid="${s.uid}" data-exo="${exUid}"
         style="font-size:11px;font-weight:700;padding:4px 0;width:100%;justify-content:center">

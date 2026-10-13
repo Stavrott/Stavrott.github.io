@@ -4,6 +4,7 @@ import { showToast, formatDate, formatDuration, openModal, closeModal, emptyStat
 import { hasActiveSeance, startSeance, resumeActiveView, tryRestoreSeance, MAX_OVERHEAD_MIN } from './seance-active.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 import { SET_TYPES, setTypeOf, isWorkingRow, setTypeClass, setTypeLabel } from '../js/set-types.js';
+import { formatDuree } from '../js/metrics.js';
 
 // ── Chargement de la page ─────────────────────────────────────────────
 
@@ -66,6 +67,20 @@ export async function loadSeances(section) {
   });
 
   await _loadList(section, 'recentes');
+}
+
+// Une série du détail : charge × répétitions, ou durée (gainage, cardio,
+// sport) avec vitesse, inclinaison ou résistance quand il y en a.
+function _setLabel(s) {
+  if (s.poids_kg == null && s.repetitions == null && s.duree_s != null) {
+    return [
+      formatDuree(s.duree_s),
+      s.vitesse_kmh != null ? `${String(s.vitesse_kmh).replace('.', ',')} km/h` : null,
+      s.inclinaison_pct != null ? `${String(s.inclinaison_pct).replace('.', ',')} %` : null,
+      s.resistance != null ? `niv. ${String(s.resistance).replace('.', ',')}` : null,
+    ].filter(Boolean).join(' · ');
+  }
+  return `${s.poids_kg ?? '—'} kg × ${s.repetitions ?? '—'}`;
 }
 
 // ── Réparation des séances incomplètes ───────────────────────────────
@@ -614,7 +629,7 @@ async function _openSeanceDetail(seanceId, seanceNom, section) {
     const [{ data: series }, { data: seance }] = await Promise.all([
       supabase
         .from('series')
-        .select('exercice_nom, numero_serie, poids_kg, repetitions, temps_repos_s, notes, type_serie')
+        .select('exercice_nom, numero_serie, poids_kg, repetitions, duree_s, vitesse_kmh, inclinaison_pct, resistance, temps_repos_s, notes, type_serie')
         .eq('seance_id', seanceId)
         .order('exercice_nom')
         .order('numero_serie'),
@@ -680,7 +695,7 @@ async function _openSeanceDetail(seanceId, seanceNom, section) {
               <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-3);background:var(--surface-2);border-radius:var(--radius-sm)">
                 <div class="set-num set-num-done ${setTypeClass(s.type_serie)}" style="flex-shrink:0"
                   title="${escapeHtml(setTypeLabel(s.type_serie))}">${SET_TYPES[setTypeOf(s.type_serie)].court || s.numero_serie}</div>
-                <span style="flex:1;font-size:var(--font-size-sm);font-weight:700">${s.poids_kg ?? '—'} kg × ${s.repetitions ?? '—'}</span>
+                <span style="flex:1;font-size:var(--font-size-sm);font-weight:700">${_setLabel(s)}</span>
                 ${s.notes ? `<span style="font-size:var(--font-size-xs);color:var(--text-muted)">${s.notes}</span>` : ''}
               </div>`).join('')}
           </div>
