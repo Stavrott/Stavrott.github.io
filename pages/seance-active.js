@@ -6,7 +6,7 @@ import { startRestTimer, hideTimer }  from '../components/timer.js';
 import { APP_CONFIG }                 from '../js/config.js';
 import { metricFields, parseFieldValue, fieldByKey, FIELD_DB_COLUMN, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
 import { SET_TYPES, DEFAULT_SET_TYPE, setTypeOf, isWorkingSet, setTypeLabel, setTypeClass } from '../js/set-types.js';
-import { estimateCaloriesSeance, musclesTravailles } from '../js/calories.js';
+import { estimateCaloriesSeance, musclesTravailles, sportMinutes } from '../js/calories.js';
 import { muscleShares, muscleWeights, muscleBarsHTML, formatKg } from '../js/pulse-ui.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 import { getPoidsActuel } from './profil.js';
@@ -729,8 +729,11 @@ function _chronoAction(action) {
 }
 
 function _focusStep(ei, si, key, dir) {
-  const set = _state.exercices[ei]?.sets[si];
-  const f   = fieldByKey(key);
+  const exo = _state.exercices[ei];
+  const set = exo?.sets[si];
+  // Le pas dépend du type de l'exercice : 5 s pour un gainage, 5 min pour
+  // un sport, alors que plusieurs types partagent le champ « duree ».
+  const f   = metricFields(exo?.type_metrique).find(x => x.key === key) ?? fieldByKey(key);
   if (!set || !f || set.done) return;
   const input = _section.querySelector(`.focus-step-input[data-field="${key}"][data-exo="${ei}"][data-set="${si}"]`);
   const cur   = input ? (parseFieldValue(f, input.value) ?? 0) : (set[key] ?? 0);
@@ -1972,7 +1975,9 @@ async function _confirmFinish() {
   // accidentel ne doit jamais suffire à elle seul.
   if (!await confirmDialog('Voulez-vous vraiment terminer cette séance ?', { confirmLabel: 'Terminer', danger: false })) return;
 
-  const duree = await _realDurationMinutes();
+  // Un match saisi après coup dure ce qui a été saisi, pas le temps passé
+  // dans l'appli.
+  const duree = Math.max(await _realDurationMinutes(), Math.round(sportMinutes(_state.exercices)));
 
   const doneNoms = new Set(_state.exercices.filter(e => e.sets.some(s => s.done)).map(e => e.nom));
   const missingFromRoutine = (_state.routineExerciceNoms ?? []).filter(nom => !doneNoms.has(nom));

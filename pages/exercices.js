@@ -6,6 +6,7 @@ import { fetchAll, sessionsOf, summarize, fmtNum, fmtDuree, fmtShortDate, lineCh
 import { fetchExerciseImage, fetchExerciseImages } from '../js/exercisedb.js';
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 import { METRIC_TYPES, DEFAULT_METRIC_TYPE } from '../js/metrics.js';
+import { EXERCICES_PLUS } from '../js/exercices-plus.js';
 
 // ── Bibliothèque intégrée ─────────────────────────────────────────────
 
@@ -303,6 +304,9 @@ export const EXERCICES = [
   { nom: 'Corde à sauter', groupe: 'Cardio', materiel: 'Corde', niveau: 'Débutant',
     muscles: ['Cardio-vasculaire', 'Mollets', 'Épaules'], type_metrique: 'isometrique',
     description: 'Sauts à la corde en continu. Excellent pour la coordination, l\'endurance et l\'explosivité des mollets.' },
+
+  // Bibliothèque étendue et sports (js/exercices-plus.js).
+  ...EXERCICES_PLUS.map(({ img, met, ...exo }) => exo),
 ];
 
 const GROUPES_BASE = [...new Set(EXERCICES.map(e => e.groupe))];
