@@ -1,5 +1,6 @@
 import { currentUser, getUserPrenom } from '../js/auth.js';
 import { supabase }  from '../js/supabase.js';
+import { navigate }  from '../js/router.js';
 import { showToast, todayStr, confirmDialog } from '../js/utils.js';
 
 const OBJECTIFS = [
@@ -185,6 +186,20 @@ function _render(section, profil, histPoids) {
       </div>
     </div>
 
+    <!-- Coaching -->
+    <div class="page-section">
+      <h3 class="section-title" style="margin-bottom:var(--space-3)">Coaching</h3>
+      <button class="list-item clickable" id="btn-coaching" style="width:100%;text-align:left">
+        <span class="item-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        </span>
+        <span class="item-body">
+          <span class="item-title" style="display:block">Mon coach et mes membres</span>
+          <span class="item-subtitle" style="display:block">Rejoindre un coach, ou inviter des membres et leur assigner tes programmes</span>
+        </span>
+      </button>
+    </div>
+
     <!-- Équipements -->
     <div class="page-section">
       <div class="section-header">
@@ -253,6 +268,7 @@ function _render(section, profil, histPoids) {
   section.querySelector('#btn-edit-identite')?.addEventListener('click',  () => _openIdentiteModal(profil,  section));
   section.querySelector('#btn-edit-programme')?.addEventListener('click', () => _openProgrammeModal(profil, section));
   section.querySelector('#btn-edit-equip')?.addEventListener('click',     () => _openEquipModal(profil, section));
+  section.querySelector('#btn-coaching')?.addEventListener('click', () => navigate('programmes', { tab: 'coach' }));
 
   section.querySelectorAll('[data-del-poids]').forEach(btn => {
     btn.addEventListener('click', () => _deletePoids(btn.dataset.delPoids, section));

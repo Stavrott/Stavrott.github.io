@@ -2126,7 +2126,7 @@ async function _syncRoutineProgress() {
 // programme garde les charges réellement faites.
 async function _syncProgrammeProgress() {
   const ref = _state?.programmeRef;
-  if (!ref?.id || ref.day == null) return;
+  if (!ref?.id || ref.day == null || ref.coach) return;
   try {
     const { data: prog, error } = await supabase
       .from('programmes').select('structure').eq('id', ref.id).single();

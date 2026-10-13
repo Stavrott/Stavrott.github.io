@@ -11,6 +11,7 @@ import { showToast, openModal, closeModal, showLoading, hideLoading, emptyState,
 import { startSeance, addExercicesFromRoutine, setProgrammeRef } from './seance-active.js';
 import { openRoutineBuilder }     from './routine-builder.js';
 import { openRoutineView }        from './routine-view.js';
+import { renderCoaching }         from './coaching.js';
 
 // ── Programmes prédéfinis ─────────────────────────────────────────────
 
@@ -161,7 +162,9 @@ export async function lancerSeanceProgramme(prog, di) {
   try {
     const section = document.getElementById('page-seances');
     await startSeance(jour.nom, section, () => navigate('seances'));
-    setProgrammeRef({ id: prog.id, day: di });
+    // Programme d'un coach : en lecture seule, les charges faites ne
+    // remontent pas dans son programme.
+    setProgrammeRef({ id: prog.id, day: di, ...(prog.coach ? { coach: true } : {}) });
     await addExercicesFromRoutine({ id: null, exercices: jour.exercices });
     navigate('seances');
   } catch {
@@ -186,7 +189,8 @@ export async function loadProgrammes(section, { tab } = {}) {
 function _render() {
   _section.innerHTML = `
     <div class="tabs" id="prog-tabs">
-      <button class="tab ${_tab === 'mine' ? 'active' : ''}" data-tab="mine">Mes programmes</button>
+      <button class="tab ${_tab === 'mine' ? 'active' : ''}" data-tab="mine">Les miens</button>
+      <button class="tab ${_tab === 'coach' ? 'active' : ''}" data-tab="coach">Coaching</button>
       <button class="tab ${_tab === 'models' ? 'active' : ''}" data-tab="models">Modèles</button>
     </div>
     <div id="prog-content"></div>`;
@@ -199,6 +203,7 @@ function _render() {
   });
 
   if (_tab === 'models') _renderModels();
+  else if (_tab === 'coach') renderCoaching(_section.querySelector('#prog-content'));
   else _renderMine();
 }
 

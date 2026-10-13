@@ -246,3 +246,7 @@ select cron.schedule(
 alter table public.profils add column if not exists jours_prevus smallint[] not null default '{}';
 alter table public.profils add column if not exists rappel_heure text;
 alter table public.seances add column if not exists records jsonb;
+
+-- Espace coach : liens coach ↔ membre, invitations, programmes assignés
+-- et fonctions de suivi. Voir supabase/migrations/20261013_coaching.sql
+-- (à exécuter tel quel, il est relançable).
