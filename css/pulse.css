@@ -16,7 +16,7 @@ body {
 .auth-screen::before,
 .auth-screen::after { display: none; }
 .auth-logo-icon { width: 88px; height: 88px; margin-bottom: var(--space-4); }
-.auth-app-icon { width: 88px; height: 88px; filter: none; }
+.auth-app-icon { width: 88px; height: 88px; filter: none; color: var(--color-primary); }
 .auth-logo h1 { font-weight: 700; letter-spacing: 0.3em; }
 .auth-card {
   background: transparent;

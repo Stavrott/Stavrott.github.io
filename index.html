@@ -37,11 +37,19 @@
 
         <div class="auth-logo">
           <div class="auth-logo-icon">
-            <svg class="auth-app-icon" viewBox="0 0 64 64" fill="none" stroke="var(--color-primary)" stroke-width="3" stroke-linecap="round" role="img" aria-label="Forme">
-              <circle cx="32" cy="32" r="27"/>
-              <circle cx="32" cy="32" r="9"/>
-              <ellipse cx="13" cy="32" rx="4" ry="6" fill="var(--color-primary)" stroke="none"/>
-              <ellipse cx="51" cy="32" rx="4" ry="6" fill="var(--color-primary)" stroke="none"/>
+            <svg class="auth-app-icon" viewBox="0 0 64 64" role="img" aria-label="Forme">
+              <mask id="logo-cut-auth">
+                <rect width="64" height="64" fill="#fff"/>
+                <circle cx="32" cy="32" r="23.5" fill="none" stroke="#000" stroke-width="1.6" opacity="0.5"/>
+                <g transform="rotate(-35 32 32) translate(32 32) scale(0.92) translate(-32 -32)" fill="#000">
+                  <rect x="21" y="30" width="22" height="4" rx="1"/>
+                  <rect x="16" y="23" width="6" height="18" rx="2"/>
+                  <rect x="42" y="23" width="6" height="18" rx="2"/>
+                  <rect x="11.5" y="26.5" width="5" height="11" rx="1.6"/>
+                  <rect x="47.5" y="26.5" width="5" height="11" rx="1.6"/>
+                </g>
+              </mask>
+              <circle cx="32" cy="32" r="28" fill="currentColor" mask="url(#logo-cut-auth)"/>
             </svg>
           </div>
           <h1>FORME</h1>
@@ -123,11 +131,19 @@
               <path d="M19 12H5M12 5l-7 7 7 7"/>
             </svg>
           </button>
-          <svg class="header-logo" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true">
-            <circle cx="32" cy="32" r="27"/>
-            <circle cx="32" cy="32" r="9"/>
-            <ellipse cx="13" cy="32" rx="4" ry="6" fill="currentColor" stroke="none"/>
-            <ellipse cx="51" cy="32" rx="4" ry="6" fill="currentColor" stroke="none"/>
+          <svg class="header-logo" viewBox="0 0 64 64" aria-hidden="true">
+            <mask id="logo-cut-header">
+              <rect width="64" height="64" fill="#fff"/>
+              <circle cx="32" cy="32" r="23.5" fill="none" stroke="#000" stroke-width="1.6" opacity="0.5"/>
+              <g transform="rotate(-35 32 32) translate(32 32) scale(0.92) translate(-32 -32)" fill="#000">
+                <rect x="21" y="30" width="22" height="4" rx="1"/>
+                <rect x="16" y="23" width="6" height="18" rx="2"/>
+                <rect x="42" y="23" width="6" height="18" rx="2"/>
+                <rect x="11.5" y="26.5" width="5" height="11" rx="1.6"/>
+                <rect x="47.5" y="26.5" width="5" height="11" rx="1.6"/>
+              </g>
+            </mask>
+            <circle cx="32" cy="32" r="28" fill="currentColor" mask="url(#logo-cut-header)"/>
           </svg>
           <span id="page-title" class="page-title">Forme</span>
         </div>

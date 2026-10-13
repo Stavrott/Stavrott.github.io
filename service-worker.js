@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v45';
+const CACHE_NAME = 'forme-v46';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -45,6 +45,7 @@ const STATIC_ASSETS = [
   '/icons/icon-512.png',
   '/icons/icon-180.png',
   '/icons/favicon-32.png',
+  '/icons/badge-96.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -89,7 +90,9 @@ self.addEventListener('push', (event) => {
     const options = {
       body: data.body,
       icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
+      // Badge de la barre d'état (Android) : silhouette blanche sur fond
+      // transparent, sinon il s'affiche en carré plein.
+      badge: '/icons/badge-96.png',
       tag: tagFin,
       // Un repos terminé est une alarme : elle reste affichée jusqu'à ce
       // qu'on la balaie, au lieu de disparaître pendant qu'on a le nez

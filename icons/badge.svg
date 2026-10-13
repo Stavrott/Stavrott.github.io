@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <g transform="translate(0 0) scale(8)">
+  <mask id="cut">
+    <rect width="64" height="64" fill="#fff"/>
+    <circle cx="32" cy="32" r="23.5" fill="none" stroke="#000" stroke-width="1.6" opacity="0.5"/>
+    <g transform="rotate(-35 32 32) translate(32 32) scale(0.92) translate(-32 -32)" fill="#000">
+      <rect x="21" y="30" width="22" height="4" rx="1"/>
+      <rect x="16" y="23" width="6" height="18" rx="2"/>
+      <rect x="42" y="23" width="6" height="18" rx="2"/>
+      <rect x="11.5" y="26.5" width="5" height="11" rx="1.6"/>
+      <rect x="47.5" y="26.5" width="5" height="11" rx="1.6"/>
+    </g>
+  </mask>
+  <circle cx="32" cy="32" r="28" fill="#FFFFFF" mask="url(#cut)"/>
+  </g>
+</svg>
