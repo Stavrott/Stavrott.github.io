@@ -852,3 +852,40 @@ body {
 .xd-text { font-size: var(--font-size-sm); color: var(--text-secondary); line-height: 1.65; }
 .xd-map { padding: var(--space-3); border-radius: var(--radius-xl); background: var(--surface-2); }
 .xd-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ══════════════════════════════════════════════════════════════════
+   Coaching — coach ↔ membres (pages/coaching.js)
+   ══════════════════════════════════════════════════════════════════ */
+.coach-hint { font-size: var(--font-size-sm); color: var(--text-secondary); line-height: 1.5; }
+.coach-hint code { font-size: var(--font-size-xs); word-break: break-all; }
+.coach-empty { display: flex; flex-direction: column; gap: var(--space-3); }
+.coach-empty-title { font-weight: 700; font-size: var(--font-size-md); }
+.coach-block { display: flex; flex-direction: column; gap: var(--space-3); }
+.coach-block + .coach-block { margin-top: var(--space-5); }
+.coach-head { display: flex; align-items: center; gap: var(--space-3); }
+.coach-name { font-weight: 700; font-size: var(--font-size-md); }
+.coach-head .coach-hint { font-size: var(--font-size-xs); }
+.coach-avatar {
+  width: 40px; height: 40px; flex-shrink: 0; border-radius: var(--radius-full);
+  border: 1.5px solid var(--color-primary); color: var(--color-primary);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: var(--font-size-md);
+}
+.coach-chev { color: var(--text-muted); display: flex; }
+.coach-chev svg { width: 18px; height: 18px; }
+.coach-tag {
+  display: inline-block; margin-bottom: 4px; padding: 2px 8px; border-radius: var(--radius-full);
+  background: var(--color-primary-light); color: var(--color-primary);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.coach-pr {
+  display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: var(--radius-full);
+  background: var(--color-highlight-light); color: var(--color-highlight);
+  font-size: 10px; font-weight: 700; vertical-align: middle;
+}
+.coach-code {
+  font-size: 2.25rem; font-weight: 700; letter-spacing: 0.22em; padding: var(--space-4) 0;
+  border-radius: var(--radius-xl); background: var(--surface-2); font-variant-numeric: tabular-nums;
+}
+.coach-code-input { text-transform: uppercase; letter-spacing: 0.2em; font-weight: 700; text-align: center; font-size: var(--font-size-lg); }
+.coach-assign { display: flex; flex-wrap: wrap; gap: var(--space-2); }

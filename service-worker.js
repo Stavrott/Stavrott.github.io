@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v44';
+const CACHE_NAME = 'forme-v45';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -26,12 +26,14 @@ const STATIC_ASSETS = [
   '/js/sync-queue.js',
   '/js/perf.js',
   '/js/reminders.js',
+  '/js/coaching.js',
   '/pages/home.js',
   '/pages/seances.js',
   '/pages/seance-active.js',
   '/pages/routine-builder.js',
   '/pages/routine-view.js',
   '/pages/programmes.js',
+  '/pages/coaching.js',
   '/pages/stats.js',
   '/pages/nutrition.js',
   '/pages/exercices.js',

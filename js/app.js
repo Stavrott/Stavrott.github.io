@@ -17,6 +17,7 @@ import { openQuickLaunchModal } from './quick-launch.js';
 import { initActiveBar }        from './active-bar.js';
 import { initSyncQueue }        from './sync-queue.js';
 import { initReminders }        from './reminders.js';
+import { capturePendingCode, hasPendingCode } from './coaching.js';
 
 // ── Thème ────────────────────────────────────────────────────────────
 
@@ -383,6 +384,9 @@ function _launchApp() {
   initActiveBar();
   initSyncQueue();
   initReminders();
+  // Arrivée par un lien d'invitation coach : l'onglet Coaching propose
+  // de rejoindre avec le code déjà rempli.
+  if (hasPendingCode()) navigate('programmes', { tab: 'coach' });
 }
 
 // ── Appui long sur l'onglet "Séances" → lancement rapide d'une routine ─
@@ -443,6 +447,7 @@ function _onLoggedIn(user) {
 }
 
 async function boot() {
+  capturePendingCode();
   initTheme();
   initAuthUI();
   _initDemoButton();

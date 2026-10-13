@@ -1,10 +1,11 @@
 // Lancement rapide d'une séance — depuis le bouton de l'accueil, l'onglet
 // Séances ou l'appui long sur l'onglet « Séances » de la navigation.
 // Propose une séance libre, puis chaque séance de chaque programme,
-// lançable en un tap.
+// lançable en un tap. Les programmes assignés par un coach passent en tête.
 import { navigate }      from './router.js';
 import { openModal, closeModal, escapeHtml } from './utils.js';
-import { fetchProgrammes, lancerSeanceProgramme } from '../pages/programmes.js';
+import { fetchProgrammes, lancerSeanceProgramme, normalizeJour } from '../pages/programmes.js';
+import { fetchProgrammesAssignes } from './coaching.js';
 
 const _SVG_PLUS = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
 const _SVG_PLAY = `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="7 4 20 12 7 20 7 4"/></svg>`;
@@ -19,7 +20,16 @@ export async function openQuickLaunchModal() {
   const body = document.getElementById('ql-body');
 
   try {
-    const programmes = await fetchProgrammes();
+    // Sans la migration coaching (ou hors-ligne), on se passe des
+    // programmes du coach plutôt que de bloquer le lancement.
+    const [mine, assignes] = await Promise.all([
+      fetchProgrammes(),
+      fetchProgrammesAssignes().catch(() => []),
+    ]);
+    const programmes = [
+      ...assignes.map(p => ({ ...p, structure: (p.structure ?? []).map(normalizeJour) })),
+      ...mine,
+    ];
     const todayIdx = (new Date().getDay() + 6) % 7; // 0 = lundi
 
     body.innerHTML = `
@@ -34,7 +44,7 @@ export async function openQuickLaunchModal() {
 
         ${programmes.map((p, pi) => p.structure.length ? `
           <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
-            color:var(--text-muted);margin:var(--space-3) 0 2px">${escapeHtml(p.nom)}</p>
+            color:var(--text-muted);margin:var(--space-3) 0 2px">${escapeHtml(p.nom)}${p.coach ? ' · de ton coach' : ''}</p>
           ${p.structure.map((j, di) => {
             const prevu = (j.joursSemaine ?? []).includes(todayIdx);
             return `
@@ -50,8 +60,8 @@ export async function openQuickLaunchModal() {
         <button class="list-item clickable" id="ql-progs" style="gap:10px;width:100%;text-align:left;margin-top:var(--space-3)">
           <span class="item-icon" style="flex-shrink:0">${_SVG_CAL}</span>
           <span class="item-body">
-            <span class="item-title" style="display:block">${programmes.length ? 'Gérer mes programmes' : 'Créer un programme'}</span>
-            <span class="item-subtitle" style="display:block">${programmes.length ? 'Modifier, ajouter une séance, partir d’un modèle' : 'Ou pars d’un modèle : PPL, Full Body, 5×5'}</span>
+            <span class="item-title" style="display:block">${mine.length ? 'Gérer mes programmes' : 'Créer un programme'}</span>
+            <span class="item-subtitle" style="display:block">${mine.length ? 'Modifier, ajouter une séance, partir d’un modèle' : 'Ou pars d’un modèle : PPL, Full Body, 5×5'}</span>
           </span>
         </button>
       </div>`;
