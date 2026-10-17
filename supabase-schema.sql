@@ -250,3 +250,6 @@ alter table public.seances add column if not exists records jsonb;
 -- Espace coach : liens coach ↔ membre, invitations, programmes assignés
 -- et fonctions de suivi. Voir supabase/migrations/20261013_coaching.sql
 -- (à exécuter tel quel, il est relançable).
+
+-- Espace coach : détail d'une séance d'un membre (seance_membre). Voir
+-- supabase/migrations/20261017_coaching_detail_seance.sql (relançable).
