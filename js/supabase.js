@@ -48,18 +48,47 @@ export async function dbUpsert(table, row) {
 
 // ── Export / Import JSON ─────────────────────────────────────────────
 
+// Tables exportées, dans l'ordre d'import (les séances avant leurs séries).
+// onConflict : tables à une ligne par utilisateur (ou par jour), où la
+// ligne existante est remplacée plutôt que dupliquée.
+const _EXPORT_TABLES = [
+  { table: 'seances' },
+  { table: 'series' },
+  { table: 'programmes' },
+  { table: 'nutrition' },
+  { table: 'exercices_custom' },
+  { table: 'historique_poids',    onConflict: 'user_id,date' },
+  { table: 'objectifs_nutrition', onConflict: 'user_id' },
+];
+
+// Toutes les lignes de l'utilisateur : Supabase plafonne chaque réponse à
+// 1 000 lignes, on pagine (sinon l'export des séries était tronqué).
+// Une table absente de la base (migration non jouée) est simplement vide.
+async function _selectAllRows(table, userId) {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from(table).select('*')
+      .eq('user_id', userId).order('id').range(from, from + 999);
+    if (error) {
+      if (['42P01', 'PGRST205'].includes(error.code)) return out;
+      throw error;
+    }
+    out.push(...data);
+    if (data.length < 1000) return out;
+  }
+}
+
 export async function exportAllData(userId) {
-  const [seances, series, programmes, nutrition, profil] = await Promise.all([
-    dbSelect('seances',    { eq: { user_id: userId } }),
-    dbSelect('series',     { eq: { user_id: userId } }),
-    dbSelect('programmes', { eq: { user_id: userId } }),
-    dbSelect('nutrition',  { eq: { user_id: userId } }),
-    dbSelect('profils',    { eq: { user_id: userId }, single: true }).catch(() => null),
+  const [profil, ...rows] = await Promise.all([
+    dbSelect('profils', { eq: { user_id: userId }, single: true }).catch(() => null),
+    ..._EXPORT_TABLES.map(({ table }) => _selectAllRows(table, userId)),
   ]);
+  const data = { profil };
+  _EXPORT_TABLES.forEach(({ table }, i) => { data[table] = rows[i]; });
   return {
     exportedAt: new Date().toISOString(),
-    version: '1.0.0',
-    data: { seances, series, programmes, nutrition, profil },
+    version: '1.1.0',
+    data,
   };
 }
 
@@ -67,11 +96,16 @@ export async function importAllData(userId, json) {
   const { data } = json;
   if (!data) throw new Error('Format JSON invalide');
 
-  const tables = ['seances', 'series', 'programmes', 'nutrition'];
-  for (const table of tables) {
+  for (const { table, onConflict } of _EXPORT_TABLES) {
     if (!data[table]?.length) continue;
-    const rows = data[table].map((r) => ({ ...r, user_id: userId }));
-    const { error } = await supabase.from(table).upsert(rows);
-    if (error) throw error;
+    const rows = data[table].map((r) => {
+      const row = { ...r, user_id: userId };
+      if (onConflict) delete row.id;
+      return row;
+    });
+    for (let i = 0; i < rows.length; i += 500) {
+      const { error } = await supabase.from(table).upsert(rows.slice(i, i + 500), onConflict ? { onConflict } : undefined);
+      if (error) throw error;
+    }
   }
 }

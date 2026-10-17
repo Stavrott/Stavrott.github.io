@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forme-v50';
+const CACHE_NAME = 'forme-v51';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -188,14 +188,10 @@ self.addEventListener('fetch', (event) => {
   // par une extension du navigateur) — Cache.put() rejette ces schémas.
   if (!url.protocol.startsWith('http')) return;
 
-  if (url.hostname.includes('supabase.co') || url.hostname.includes('supabase.io')) {
-    event.respondWith(
-      fetch(request).catch(() => new Response(JSON.stringify({ error: 'Hors ligne' }), {
-        headers: { 'Content-Type': 'application/json' },
-      }))
-    );
-    return;
-  }
+  // Supabase : jamais intercepté. Hors ligne, la requête doit échouer pour
+  // de vrai — une fausse réponse 200 passait pour un succès, et la file
+  // hors-ligne (js/sync-queue.js) jetait alors des séries non envoyées.
+  if (url.hostname.includes('supabase.co') || url.hostname.includes('supabase.io')) return;
 
   if (url.hostname.includes('fonts.googleapis.com') || url.hostname.includes('fonts.gstatic.com')) {
     event.respondWith(
