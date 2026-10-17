@@ -1,6 +1,6 @@
 import { initAuth, signIn, signUp, signOut, resetPassword, getUserPrenom, currentUser } from './auth.js';
 import { initRouter, registerPage, navigate } from './router.js';
-import { showToast, lsGet, lsSet, openModal, closeModal } from './utils.js';
+import { showToast, lsGet, lsSet, openModal, closeModal, localDateStr } from './utils.js';
 import { exportAllData as exportData, importAllData } from './supabase.js';
 import { getProfilSummary } from '../pages/profil.js';
 
@@ -18,6 +18,7 @@ import { initActiveBar }        from './active-bar.js';
 import { initSyncQueue }        from './sync-queue.js';
 import { initReminders }        from './reminders.js';
 import { capturePendingCode, hasPendingCode } from './coaching.js';
+import { hasActiveSeance }      from '../pages/seance-active.js';
 
 // ── Thème ────────────────────────────────────────────────────────────
 
@@ -319,7 +320,7 @@ function initUserDrawer() {
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
       a.href     = url;
-      a.download = `musclapp-export-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `forme-export-${localDateStr()}.json`;
       a.click();
       URL.revokeObjectURL(url);
       showToast('Export réussi !', 'success');
@@ -452,6 +453,18 @@ function _onLoggedIn(user) {
   }
 }
 
+// Nouvelle version de l'appli installée : on recharge pour l'utiliser,
+// mais jamais en pleine séance ni sur une fenêtre ouverte (récap de fin,
+// saisie en cours) — on attend que l'utilisateur ait fini.
+function _reloadWhenIdle() {
+  const idle = () => !hasActiveSeance()
+    && document.getElementById('modal-overlay')?.classList.contains('hidden') !== false;
+  if (idle()) { window.location.reload(); return; }
+  const id = setInterval(() => {
+    if (idle()) { clearInterval(id); window.location.reload(); }
+  }, 2000);
+}
+
 async function boot() {
   capturePendingCode();
   initTheme();
@@ -470,7 +483,7 @@ async function boot() {
     navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' })
       .then((reg) => reg.update().catch(() => {}))
       .catch(() => {});
-    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
+    navigator.serviceWorker.addEventListener('controllerchange', _reloadWhenIdle);
   }
 }
 

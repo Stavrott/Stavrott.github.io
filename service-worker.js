@@ -1,4 +1,7 @@
-const CACHE_NAME = 'forme-v51';
+const CACHE_NAME = 'forme-v52';
+// Polices Google : cache à part, non versionné (elles ne changent pas),
+// pour ne pas les retélécharger à chaque mise à jour de l'appli.
+const FONT_CACHE = 'forme-fonts';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -173,7 +176,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys
-        .filter((k) => k !== CACHE_NAME)
+        .filter((k) => k !== CACHE_NAME && k !== FONT_CACHE)
         .map((k) => caches.delete(k)))
     )
   );
@@ -195,7 +198,7 @@ self.addEventListener('fetch', (event) => {
 
   if (url.hostname.includes('fonts.googleapis.com') || url.hostname.includes('fonts.gstatic.com')) {
     event.respondWith(
-      caches.open(CACHE_NAME + '-fonts').then((cache) =>
+      caches.open(FONT_CACHE).then((cache) =>
         cache.match(request).then((cached) => {
           if (cached) return cached;
           return fetch(request).then((response) => {
