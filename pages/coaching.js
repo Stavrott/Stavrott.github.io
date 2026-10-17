@@ -10,12 +10,13 @@ import { showToast, openModal, closeModal, showLoading, hideLoading, confirmDial
 import { formatKg }    from '../js/pulse-ui.js';
 import {
   fetchMesCoachs, rejoindreCoach, quitterCoach, fetchProgrammesAssignes,
-  fetchMembres, fetchInvitation, invitationLink, fetchSuiviMembre,
+  fetchMembres, fetchInvitation, invitationLink, fetchSuiviMembre, fetchSeanceMembre,
   fetchAssignations, assignerProgramme, retirerAssignation, retirerMembre,
   isCoachingMissing, coachingErrorMessage, takePendingCode,
 } from '../js/coaching.js';
 import { fetchProgrammes, lancerSeanceProgramme, normalizeJour } from './programmes.js';
 import { openRoutineView } from './routine-view.js';
+import { seanceDetailHTML, highlightSeanceDetail } from './seances.js';
 
 const _SVG_PLAY  = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="7 4 20 12 7 20 7 4"/></svg>`;
 const _SVG_PLUS  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
@@ -374,14 +375,15 @@ async function _openMembre(membreId) {
             const tag = progById.has(s.programme_id) && assignesIds.has(s.programme_id)
               ? `<span class="coach-tag" style="margin:0 0 4px">${escapeHtml(progById.get(s.programme_id).nom)}</span>` : '';
             return `
-              <div class="list-item" style="background:var(--surface-2);align-items:flex-start">
+              <button class="list-item clickable" data-seance="${s.id}" style="width:100%;text-align:left;background:var(--surface-2);align-items:flex-start">
                 <span class="item-body">
                   ${tag}
                   <span class="item-title" style="display:block">${escapeHtml(s.nom)}${s.records?.length ? ` <span class="coach-pr">${s.records.length} record${s.records.length > 1 ? 's' : ''}</span>` : ''}</span>
                   <span class="item-subtitle" style="display:block">${meta}</span>
                   ${s.exercices?.length ? `<span class="item-subtitle" style="display:block;margin-top:2px">${s.exercices.map(escapeHtml).join(', ')}</span>` : ''}
                 </span>
-              </div>`;
+                <span class="coach-chev" style="align-self:center">${_SVG_CHEV}</span>
+              </button>`;
           }).join('') || '<p class="coach-hint">Aucune séance pour l’instant.</p>'}
         </div>
       </div>
@@ -390,6 +392,11 @@ async function _openMembre(membreId) {
     </div>`;
 
   body.onclick = async (e) => {
+    const seance = e.target.closest('[data-seance]');
+    if (seance) {
+      body.onclick = null;
+      return _openSeanceMembre(membre, seance.dataset.seance);
+    }
     const add = e.target.closest('[data-assign]');
     const rm  = e.target.closest('[data-unassign]');
     if (add || rm) {
@@ -426,6 +433,44 @@ async function _openMembre(membreId) {
       _refresh();
     }
   };
+}
+
+// ── Détail d'une séance d'un membre ───────────────────────────────────
+
+async function _openSeanceMembre(membre, seanceId) {
+  openModal({
+    title: 'Séance',
+    body: _skeleton(),
+    footer: `<button class="btn btn-secondary btn-full" id="cs-back">← ${escapeHtml(membre.prenom)}</button>`,
+  });
+  document.getElementById('cs-back')?.addEventListener('click', () => _openMembre(membre.membre_id));
+  const body = document.getElementById('modal-body');
+
+  let detail;
+  try {
+    detail = await fetchSeanceMembre(seanceId);
+  } catch (e) {
+    body.innerHTML = `<p class="coach-hint" style="text-align:center;padding:var(--space-6)">${isCoachingMissing(e)
+      ? 'Détail pas encore activé : lance <code>supabase/migrations/20261017_coaching_detail_seance.sql</code> dans Supabase (SQL Editor).'
+      : coachingErrorMessage(e)}</p>`;
+    return;
+  }
+  if (!body.isConnected || document.getElementById('modal-overlay')?.classList.contains('hidden')) return;
+
+  const { seance, series } = detail;
+  document.getElementById('modal-title').textContent = seance.nom || 'Séance';
+  const meta = [
+    formatDate(seance.date, { weekday: 'short', short: true }),
+    seance.duree_minutes ? formatDuration(seance.duree_minutes) : null,
+  ].filter(Boolean).join(' · ');
+
+  body.innerHTML = `
+    <p class="coach-hint" style="margin-bottom:var(--space-4)">${escapeHtml(membre.prenom)} · ${meta}</p>
+    ${seance.notes ? `<p class="card" style="margin-bottom:var(--space-4);padding:var(--space-3);font-size:var(--font-size-sm)">${escapeHtml(seance.notes)}</p>` : ''}
+    ${series.length
+      ? seanceDetailHTML(series, seance)
+      : '<p class="coach-hint" style="text-align:center;padding:var(--space-6)">Aucune série enregistrée.</p>'}`;
+  highlightSeanceDetail(body, seance);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────

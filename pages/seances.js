@@ -645,66 +645,76 @@ async function _openSeanceDetail(seanceId, seanceNom, section) {
       return;
     }
 
-    const byExo = series.reduce((acc, s) => {
-      if (!acc[s.exercice_nom]) acc[s.exercice_nom] = [];
-      acc[s.exercice_nom].push(s);
-      return acc;
-    }, {});
-
-    // Les compteurs ne retiennent que le travail effectif ; l'échauffement
-    // reste visible dans le détail, simplement il ne gonfle pas le bilan.
-    const travail  = series.filter(isWorkingRow);
-    const nEchauf  = series.length - travail.length;
-    const totalVol = travail.reduce((n, s) => n + (s.poids_kg ?? 0) * (s.repetitions ?? 0), 0);
-    const calories = seance?.calories_estimees ?? null;
-    const muscles  = seance?.muscles_travailles ?? [];
-
-    document.getElementById('modal-body').innerHTML = `
-      <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-5)">
-        <div class="card" style="flex:1;text-align:center;padding:var(--space-3)">
-          <p class="card-title">Exercices</p>
-          <p class="card-value" style="font-size:var(--font-size-xl)">${Object.keys(byExo).length}</p>
-        </div>
-        <div class="card" style="flex:1;text-align:center;padding:var(--space-3)">
-          <p class="card-title">Séries</p>
-          <p class="card-value" style="font-size:var(--font-size-xl)">${travail.length}${nEchauf ? `<span> +${nEchauf} éch.</span>` : ''}</p>
-        </div>
-        <div class="card" style="flex:1;text-align:center;padding:var(--space-3)">
-          <p class="card-title">Volume</p>
-          <p class="card-value" style="font-size:var(--font-size-xl)">${Math.round(totalVol)}<span> kg</span></p>
-        </div>
-        ${calories != null ? `
-        <div class="card" style="flex:1;text-align:center;padding:var(--space-3)">
-          <p class="card-title">Calories</p>
-          <p class="card-value" style="font-size:var(--font-size-xl)">${calories}<span> kcal</span></p>
-        </div>` : ''}
-      </div>
-      ${muscles.length ? `
-      <div class="card" style="margin-bottom:var(--space-5);padding:var(--space-4)">
-        <p style="font-weight:800;font-size:var(--font-size-sm);margin-bottom:var(--space-3)">Muscles travaillés</p>
-        ${bodyMapHTML('detail')}
-        <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:center;margin-top:var(--space-3)">
-          ${muscles.map(m => `<span class="muscle-tag">${escapeHtml(m)}</span>`).join('')}
-        </div>
-      </div>` : ''}
-      ${Object.entries(byExo).map(([nom, sets]) => `
-        <div style="margin-bottom:var(--space-5)">
-          <p style="font-weight:800;font-size:var(--font-size-sm);margin-bottom:var(--space-2)">${nom}</p>
-          <div style="display:flex;flex-direction:column;gap:var(--space-2)">
-            ${sets.map(s => `
-              <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-3);background:var(--surface-2);border-radius:var(--radius-sm)">
-                <div class="set-num set-num-done ${setTypeClass(s.type_serie)}" style="flex-shrink:0"
-                  title="${escapeHtml(setTypeLabel(s.type_serie))}">${SET_TYPES[setTypeOf(s.type_serie)].court || s.numero_serie}</div>
-                <span style="flex:1;font-size:var(--font-size-sm);font-weight:700">${_setLabel(s)}</span>
-                ${s.notes ? `<span style="font-size:var(--font-size-xs);color:var(--text-muted)">${s.notes}</span>` : ''}
-              </div>`).join('')}
-          </div>
-        </div>`).join('')}`;
-
-    highlightMuscles(document.getElementById('modal-body'), groupsFromMuscleNames(muscles), 'detail');
+    const body = document.getElementById('modal-body');
+    body.innerHTML = seanceDetailHTML(series, seance);
+    highlightSeanceDetail(body, seance);
   } catch {
     document.getElementById('modal-body').innerHTML = `<p style="color:var(--color-error);text-align:center">Erreur de chargement</p>`;
   }
+}
+
+// Détail d'une séance (bilan, muscles, séries par exercice). Partagé
+// avec l'espace coach, qui lit les mêmes lignes via seance_membre().
+export function seanceDetailHTML(series, seance) {
+  const byExo = series.reduce((acc, s) => {
+    if (!acc[s.exercice_nom]) acc[s.exercice_nom] = [];
+    acc[s.exercice_nom].push(s);
+    return acc;
+  }, {});
+
+  // Les compteurs ne retiennent que le travail effectif ; l'échauffement
+  // reste visible dans le détail, simplement il ne gonfle pas le bilan.
+  const travail  = series.filter(isWorkingRow);
+  const nEchauf  = series.length - travail.length;
+  const totalVol = travail.reduce((n, s) => n + (s.poids_kg ?? 0) * (s.repetitions ?? 0), 0);
+  const calories = seance?.calories_estimees ?? null;
+  const muscles  = seance?.muscles_travailles ?? [];
+
+  return `
+    <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-5)">
+      <div class="card" style="flex:1;text-align:center;padding:var(--space-3)">
+        <p class="card-title">Exercices</p>
+        <p class="card-value" style="font-size:var(--font-size-xl)">${Object.keys(byExo).length}</p>
+      </div>
+      <div class="card" style="flex:1;text-align:center;padding:var(--space-3)">
+        <p class="card-title">Séries</p>
+        <p class="card-value" style="font-size:var(--font-size-xl)">${travail.length}${nEchauf ? `<span> +${nEchauf} éch.</span>` : ''}</p>
+      </div>
+      <div class="card" style="flex:1;text-align:center;padding:var(--space-3)">
+        <p class="card-title">Volume</p>
+        <p class="card-value" style="font-size:var(--font-size-xl)">${Math.round(totalVol)}<span> kg</span></p>
+      </div>
+      ${calories != null ? `
+      <div class="card" style="flex:1;text-align:center;padding:var(--space-3)">
+        <p class="card-title">Calories</p>
+        <p class="card-value" style="font-size:var(--font-size-xl)">${calories}<span> kcal</span></p>
+      </div>` : ''}
+    </div>
+    ${muscles.length ? `
+    <div class="card" style="margin-bottom:var(--space-5);padding:var(--space-4)">
+      <p style="font-weight:800;font-size:var(--font-size-sm);margin-bottom:var(--space-3)">Muscles travaillés</p>
+      ${bodyMapHTML('detail')}
+      <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:center;margin-top:var(--space-3)">
+        ${muscles.map(m => `<span class="muscle-tag">${escapeHtml(m)}</span>`).join('')}
+      </div>
+    </div>` : ''}
+    ${Object.entries(byExo).map(([nom, sets]) => `
+      <div style="margin-bottom:var(--space-5)">
+        <p style="font-weight:800;font-size:var(--font-size-sm);margin-bottom:var(--space-2)">${escapeHtml(nom)}</p>
+        <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+          ${sets.map(s => `
+            <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-3);background:var(--surface-2);border-radius:var(--radius-sm)">
+              <div class="set-num set-num-done ${setTypeClass(s.type_serie)}" style="flex-shrink:0"
+                title="${escapeHtml(setTypeLabel(s.type_serie))}">${SET_TYPES[setTypeOf(s.type_serie)].court || s.numero_serie}</div>
+              <span style="flex:1;font-size:var(--font-size-sm);font-weight:700">${_setLabel(s)}</span>
+              ${s.notes ? `<span style="font-size:var(--font-size-xs);color:var(--text-muted)">${escapeHtml(s.notes)}</span>` : ''}
+            </div>`).join('')}
+        </div>
+      </div>`).join('')}`;
+}
+
+export function highlightSeanceDetail(container, seance) {
+  highlightMuscles(container, groupsFromMuscleNames(seance?.muscles_travailles ?? []), 'detail');
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────

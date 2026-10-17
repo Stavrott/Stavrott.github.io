@@ -73,6 +73,12 @@ export async function fetchSuiviMembre(membreId) {
   return _check(await supabase.rpc('suivi_membre', { p_membre: membreId })) ?? [];
 }
 
+// Détail d'une séance d'un membre : { seance, series }, séries au format
+// de la table series (voir 20261017_coaching_detail_seance.sql).
+export async function fetchSeanceMembre(seanceId) {
+  return _check(await supabase.rpc('seance_membre', { p_seance: seanceId }));
+}
+
 export async function fetchAssignations(membreId) {
   return _check(await supabase.from('programmes_assignes')
     .select('id, programme_id, created_at')
