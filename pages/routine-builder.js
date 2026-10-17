@@ -117,7 +117,7 @@ function _loadExoImages(container) {
     const nom = el.dataset.imgNom;
     fetchExerciseImage(nom).then(url => {
       if (!el.isConnected || !url) return;
-      el.innerHTML = `<img src="${url}" alt="${nom}"
+      el.innerHTML = `<img src="${_esc(url)}" alt="${_esc(nom)}"
         style="width:100%;height:100%;object-fit:cover;display:block">`;
     });
   });

@@ -17,7 +17,10 @@ export function showToast(message, type = 'info', duration = 3000) {
   const container = document.getElementById('toast-container');
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.innerHTML = `${toastIcons[type] || ''}<span>${message}</span>`;
+  // Message en texte brut : il contient souvent des noms saisis (exercice,
+  // séance), parfois par un autre compte (programme assigné par un coach).
+  el.innerHTML = `${toastIcons[type] || ''}<span></span>`;
+  el.querySelector('span').textContent = message;
   container.appendChild(el);
 
   setTimeout(() => {
@@ -72,9 +75,10 @@ export function confirmDialog(message, opts = {}) {
     let resolved = false;
     const finish = (val) => { if (!resolved) { resolved = true; resolve(val); } };
 
+    // Message en texte brut, comme pour showToast.
     const close = openModal({
       title,
-      body: `<p style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:1.6">${message}</p>`,
+      body: `<p style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:1.6">${escapeHtml(message)}</p>`,
       footer: `
         <button class="btn btn-secondary" id="confirm-cancel">${cancelLabel}</button>
         <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="confirm-ok" style="flex:1">${confirmLabel}</button>`,

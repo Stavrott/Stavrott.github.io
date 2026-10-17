@@ -187,7 +187,7 @@ async function _copyProg(prog) {
       user_id: currentUser.id, nom: prog.nom, description: prog.description ?? null, structure: prog.structure,
     });
     if (error) throw error;
-    showToast(`« ${escapeHtml(prog.nom)} » copié dans tes programmes`, 'success');
+    showToast(`« ${prog.nom} » copié dans tes programmes`, 'success');
   } catch {
     showToast('Erreur lors de la copie', 'error');
   } finally {
@@ -223,7 +223,7 @@ function _openJoinModal(code) {
     try {
       const prenom = await rejoindreCoach(value);
       closeModal();
-      showToast(`Tu es suivi par ${escapeHtml(prenom)}`, 'success');
+      showToast(`Tu es suivi par ${prenom}`, 'success');
       _refresh();
     } catch (e) {
       showToast(coachingErrorMessage(e), 'error', 4000);
@@ -417,7 +417,7 @@ async function _openMembre(membreId) {
     }
     if (e.target.closest('#cm-remove')) {
       body.onclick = null;
-      if (!await confirmDialog(`Ne plus suivre ${escapeHtml(membre.prenom)} ? Ses programmes assignés lui seront retirés. Il pourra te rejoindre à nouveau avec un code.`, { confirmLabel: 'Retirer' })) {
+      if (!await confirmDialog(`Ne plus suivre ${membre.prenom} ? Ses programmes assignés lui seront retirés. Il pourra te rejoindre à nouveau avec un code.`, { confirmLabel: 'Retirer' })) {
         _openMembre(membreId);
         return;
       }

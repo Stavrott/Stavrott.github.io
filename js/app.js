@@ -213,6 +213,7 @@ function initAuthUI() {
       await signIn(email, password);
     } catch (err) {
       showError(err.message);
+    } finally {
       btn.disabled   = false;
       btn.textContent = 'Se connecter';
     }
@@ -366,6 +367,11 @@ function registerPages() {
 let _appInitialized = false;
 
 function showAuth() {
+  // Déconnexion avec l'appli lancée : on repart d'une page neuve plutôt que
+  // de réafficher l'écran de connexion par-dessus l'état du compte
+  // précédent (bouton resté sur « Connexion… », appli déjà initialisée qui
+  // ne se réaffichait plus à la connexion suivante).
+  if (_appInitialized) { location.reload(); return; }
   document.getElementById('auth-screen').classList.remove('hidden');
   document.getElementById('onboarding-screen').classList.add('hidden');
   document.getElementById('main-app').classList.add('hidden');

@@ -70,14 +70,17 @@ export async function tryRestoreSeance() {
     const saved = JSON.parse(raw);
     if (!saved?.seanceId || !saved?.startTime) return false;
 
-    // Vérifie que la séance existe en DB et n'est pas déjà terminée
-    const { data } = await supabase.from('seances')
+    // Vérifie que la séance existe en DB et n'est pas déjà terminée. Sans
+    // réseau, on reprend la copie locale : seule une réponse de la base
+    // (séance absente ou terminée) autorise à l'effacer.
+    const { data, error } = await supabase.from('seances')
       .select('id, nom, date, duree_minutes')
-      .eq('id', saved.seanceId).single();
-    if (!data || data.duree_minutes != null) { _clearPersist(); return false; }
+      .eq('id', saved.seanceId).maybeSingle();
+    if (!error && (!data || data.duree_minutes != null)) { _clearPersist(); return false; }
+    const seance = data ?? { id: saved.seanceId, nom: saved.seanceNom, date: saved.seanceDate };
 
     _state = {
-      seance:              { id: data.id, nom: data.nom, date: data.date },
+      seance:              { id: seance.id, nom: seance.nom, date: seance.date },
       routineId:           saved.routineId ?? null,
       programmeRef:        saved.programmeRef ?? null,
       chrono:              saved.chrono ?? null,
@@ -1367,11 +1370,13 @@ async function _setSerieType(ei, si, type) {
   // Série déjà validée : la ligne existe en base, on la requalifie sur place
   // plutôt que de la supprimer et de la réécrire — l'horodatage d'origine
   // sert au calcul de la durée de séance.
-  if (set.dbId) {
-    await supabase.from('series')
-      .update({ type_serie: set.type })
-      .eq('id', set.dbId)
-      .catch(() => showToast('Type modifié localement, sauvegarde impossible', 'error'));
+  // Hors ligne, la modification part dans la file comme les autres.
+  if (set.syncId) {
+    patchQueuedInsert(set.syncId, { type_serie: set.type });
+  } else if (set.dbId) {
+    let error = null;
+    try { ({ error } = await supabase.from('series').update({ type_serie: set.type }).eq('id', set.dbId)); } catch (e) { error = e; }
+    if (error) enqueueUpdate('series', set.dbId, { type_serie: set.type });
   }
 
   render();
@@ -1988,7 +1993,9 @@ async function _confirmFinish() {
 
   if (!_state.exercices.length) {
     if (await confirmDialog('Aucun exercice enregistré. Annuler la séance ?', { confirmLabel: 'Annuler la séance' })) {
-      await supabase.from('seances').delete().eq('id', _state.seance.id).catch(() => {});
+      let error = null;
+      try { ({ error } = await supabase.from('seances').delete().eq('id', _state.seance.id)); } catch (e) { error = e; }
+      if (error) enqueueDelete('seances', _state.seance.id);
       _reset();
     }
     return;
