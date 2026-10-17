@@ -5,6 +5,7 @@ import { hasActiveSeance, startSeance, resumeActiveView, tryRestoreSeance, MAX_O
 import { bodyMapHTML, highlightMuscles, groupsFromMuscleNames } from '../js/body-map.js';
 import { SET_TYPES, setTypeOf, isWorkingRow, setTypeClass, setTypeLabel } from '../js/set-types.js';
 import { formatDuree } from '../js/metrics.js';
+import { fetchAll } from '../js/perf.js';
 
 // ── Chargement de la page ─────────────────────────────────────────────
 
@@ -486,13 +487,16 @@ async function _renderVolume(section) {
   try {
     // Récupère les séries des 8 dernières semaines
     const since = localDateStr(new Date(Date.now() - 8 * 7 * 86400000));
-    const { data: series } = await supabase
+    // Minuit local (et non UTC) du premier jour ; paginé, car 8 semaines
+    // de séries peuvent dépasser le plafond de 1 000 lignes par réponse.
+    const series = await fetchAll(() => supabase
       .from('series')
       .select('seance_id, poids_kg, repetitions, created_at')
       .eq('user_id', currentUser.id)
       // Le tonnage mesure le travail produit : l'échauffement en est exclu.
       .neq('type_serie', 'echauffement')
-      .gte('created_at', since + 'T00:00:00');
+      .gte('created_at', new Date(`${since}T00:00:00`).toISOString())
+      .order('created_at'));
 
     const { data: seances } = await supabase
       .from('seances')
